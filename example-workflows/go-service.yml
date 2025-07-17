@@ -1,0 +1,54 @@
+name: Deploy Go Service
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      
+      - name: Run tests
+        run: go test -v ./...
+      
+      - name: Build binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
+      
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/go-service:${{ github.sha }} .
+          docker tag ${{ secrets.DOCKER_REGISTRY }}/go-service:${{ github.sha }} ${{ secrets.DOCKER_REGISTRY }}/go-service:latest
+      
+      - name: Push to registry
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker push ${{ secrets.DOCKER_REGISTRY }}/go-service:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_REGISTRY }}/go-service:latest
+      
+      - name: Deploy with SST (if using Lambda)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          npm install
+          npx sst deploy --stage prod
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

@@ -1,0 +1,68 @@
+name: Deploy Rust Service
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Run tests
+        run: cargo test --verbose
+      
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+      
+      - name: Build release binary
+        run: cargo build --release
+      
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/rust-service:${{ github.sha }} .
+          docker tag ${{ secrets.DOCKER_REGISTRY }}/rust-service:${{ github.sha }} ${{ secrets.DOCKER_REGISTRY }}/rust-service:latest
+      
+      - name: Push to registry
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker push ${{ secrets.DOCKER_REGISTRY }}/rust-service:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_REGISTRY }}/rust-service:latest
+      
+      - name: Deploy to VPS (alternative to SST)
+        if: github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKER_REGISTRY }}/rust-service:latest
+            docker stop rust-service || true
+            docker rm rust-service || true
+            docker run -d \
+              --name rust-service \
+              --restart always \
+              -p 8080:8080 \
+              -e RUST_LOG=info \
+              ${{ secrets.DOCKER_REGISTRY }}/rust-service:latest

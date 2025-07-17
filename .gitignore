@@ -1,0 +1,40 @@
+# Python
+venv/
+env/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gitea data
+gitea/
+postgres/
+runner/
+
+# Credentials
+*.token
+secrets.txt
+credentials.json
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.bak
+*.backup
