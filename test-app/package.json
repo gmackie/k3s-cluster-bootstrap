@@ -1,0 +1,12 @@
+{
+  "name": "k3s-test-app",
+  "version": "1.0.0",
+  "description": "Test application for k3s deployment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -6,8 +6,24 @@
       "Bash(ls:*)",
       "Bash(source:*)",
       "Bash(python:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(chmod:*)",
+      "Bash(scp:*)",
+      "Bash(ssh:*)",
+      "Bash(mkdir:*)",
+      "Bash(export KUBECONFIG=~/.kube/gmac-k3s.yaml)",
+      "Bash(kubectl apply:*)",
+      "Bash(export KUBECONFIG=~/.kube/k3s-gmac.yaml)",
+      "Bash(kubectl get:*)",
+      "Bash(./add-turntable-secrets.sh:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(dig:*)",
+      "Bash(./debug-deployment.sh:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
-  }
+  },
+  "model": "claude-opus-4-20250514"
 }
