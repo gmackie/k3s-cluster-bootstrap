@@ -6,6 +6,8 @@ on:
 
 env:
   REGISTRY: ci.gmac.io
+  # IMPORTANT: Docker image names must be lowercase. If your repo has uppercase letters,
+  # you need to manually specify a lowercase version like: owner/reponame
   IMAGE_NAME: ${{ gitea.repository }}
 
 jobs:
@@ -49,6 +51,11 @@ jobs:
       env:
         KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
       run: |
+        # Install kubectl
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+        
         # Setup kubeconfig
         echo "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
         export KUBECONFIG=/tmp/kubeconfig
