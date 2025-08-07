@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: verdaccio
+  namespace: npm-registry
+  labels:
+    app: verdaccio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: verdaccio
+  template:
+    metadata:
+      labels:
+        app: verdaccio
+    spec:
+      containers:
+      - name: verdaccio
+        image: verdaccio-auth-proxy:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 4873
+          name: http
+        env:
+        - name: VERDACCIO_PORT
+          value: "4873"
+        - name: VERDACCIO_PROTOCOL
+          value: "http"
+        - name: VERDACCIO_PUBLIC_URL
+          value: "https://npm.${DOMAIN}"
+        volumeMounts:
+        - name: config
+          mountPath: /verdaccio/conf
+          readOnly: true
+        - name: storage
+          mountPath: /verdaccio/storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /-/ping
+            port: 4873
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ping
+            port: 4873
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: verdaccio-config
+      - name: storage
+        persistentVolumeClaim:
+          claimName: verdaccio-storage
+      securityContext:
+        fsGroup: 10001

@@ -16,6 +16,7 @@ pip-delete-this-directory.txt
 *.swp
 *.swo
 *~
+*.iml
 
 # OS
 .DS_Store
@@ -30,6 +31,12 @@ runner/
 *.token
 secrets.txt
 credentials.json
+*.key
+*.pem
+*.crt
+*.p12
+*-secret.yaml
+*-secret.yml
 
 # Logs
 *.log
@@ -38,3 +45,29 @@ logs/
 # Backup files
 *.bak
 *.backup
+backups/
+
+# Cluster runtime files
+.cluster/
+*.kubeconfig
+kubeconfig-*
+
+# Temporary files
+*.tmp
+tmp/
+
+# Helm
+charts/*.tgz
+requirements.lock
+
+# Docker
+docker-compose.override.yml
+
+# Local environment overrides
+*.local
+local-values.yaml
+
+# Terraform (if used later)
+*.tfstate
+*.tfstate.*
+.terraform/

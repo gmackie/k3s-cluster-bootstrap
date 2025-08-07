@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: verdaccio
+  namespace: npm-registry
+  labels:
+    app: verdaccio
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4873
+    targetPort: 4873
+    protocol: TCP
+    name: http
+  selector:
+    app: verdaccio
+---
+# NodePort service for local access without ingress
+apiVersion: v1
+kind: Service
+metadata:
+  name: verdaccio-nodeport
+  namespace: npm-registry
+  labels:
+    app: verdaccio
+spec:
+  type: NodePort
+  ports:
+  - port: 4873
+    targetPort: 4873
+    nodePort: 30873
+    protocol: TCP
+    name: http
+  selector:
+    app: verdaccio

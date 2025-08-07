@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  registry-ui:
+    image: joxit/docker-registry-ui:2.5.7
+    container_name: registry-ui
+    restart: always
+    environment:
+      - SINGLE_REGISTRY=true
+      - REGISTRY_TITLE=CI.GMAC.IO Container Registry
+      - DELETE_IMAGES=true
+      - SHOW_CONTENT_DIGEST=true
+      - SHOW_CATALOG_NB_TAGS=true
+      - CATALOG_MIN_BRANCHES=1
+      - CATALOG_MAX_BRANCHES=10
+      - TAGLIST_PAGE_SIZE=100
+      - REGISTRY_SECURED=false
+      - CATALOG_ELEMENTS_LIMIT=1000
+      # Point to Gitea's registry API endpoint
+      - NGINX_PROXY_PASS_URL=https://ci.gmac.io
+      - PULL_URL=ci.gmac.io
+    ports:
+      - "8080:80"
+    networks:
+      - gitea
+
+networks:
+  gitea:
+    external: true

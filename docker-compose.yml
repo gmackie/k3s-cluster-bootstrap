@@ -55,6 +55,25 @@ services:
     networks:
       - gitea
 
+  # Docker Registry Browser for Gitea's container registry
+  registry-browser:
+    image: klausmeyer/docker-registry-browser:1.7.1
+    container_name: registry-browser
+    restart: always
+    environment:
+      DOCKER_REGISTRY_URL: https://ci.gmac.io
+      NO_SSL_VERIFICATION: "true"
+      # Use Gitea credentials for authentication
+      ENABLE_DELETE_IMAGES: "true"
+      PUBLIC_REGISTRY_URL: ci.gmac.io
+      # Token authentication will be required
+      TOKEN_AUTH_USER: ${GITEA_REGISTRY_USER:-gitea}
+      TOKEN_AUTH_PASSWORD: ${GITEA_REGISTRY_TOKEN}
+    ports:
+      - "8081:8080"
+    networks:
+      - gitea
+
 networks:
   gitea:
     external: false

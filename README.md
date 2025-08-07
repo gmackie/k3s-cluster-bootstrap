@@ -1,123 +1,106 @@
-# GMAC.io CI/CD Infrastructure
+# K3s Cluster Bootstrap System
 
-Self-hosted CI/CD solution using Gitea with GitHub Actions compatibility.
+A modular system for deploying and managing k3s clusters with integrated CI/CD, monitoring, and control panel.
 
 ## Features
 
-- Complete Git hosting solution
-- GitHub Actions compatible CI/CD
-- Bulk import from GitHub
-- Support for Next.js, Vite, Go, and Rust projects
-- SST integration for serverless deployments
-- Cost-effective (~$6/month on Hetzner CPX11)
+- 🚀 **Multi-Environment Support**: Deploy to local homelab or Hetzner Cloud
+- 📦 **Modular Architecture**: Pick and choose components
+- 🔄 **Integrated CI/CD**: Gitea with Actions runners
+- 📊 **Full Monitoring Stack**: Prometheus, Grafana, Loki, Alertmanager
+- 🎛️ **Control Panel**: Web-based cluster management interface
+- 💾 **Flexible Storage**: Support for NAS, Hetzner volumes, and more
+- 🔐 **Centralized Auth**: GitHub OAuth SSO across all services
+- 🔐 **Backup & DR**: Automated backups with Velero
+- 📈 **Auto-scaling**: Dynamic node management based on load
+- 🐳 **Container Registry**: Harbor with vulnerability scanning
+- 📦 **NPM Registry**: Private package registry with Verdaccio
+- 🔑 **Secrets Management**: Sealed Secrets for GitOps workflows
 
 ## Quick Start
 
-### 1. Setup Development Environment
-
+### Prerequisites
 ```bash
-# Create virtual environment and install dependencies
-./setup.sh
+# Create GitHub OAuth App at https://github.com/settings/applications/new
+# Homepage URL: https://your-domain.com
+# Callback URL: https://your-domain.com/oauth2/callback
 
-# Activate virtual environment
-source venv/bin/activate
+export GITHUB_CLIENT_ID=your-client-id
+export GITHUB_CLIENT_SECRET=your-client-secret
+export GITHUB_ORG=your-org  # Optional: restrict to org members
 ```
 
-### 2. Deploy Gitea
-
-Server is already deployed at: https://ci.gmac.io
-
-To deploy a new instance:
+### Local Deployment
 ```bash
-# Using Docker Compose (recommended)
-ssh root@your-server
-cd /opt/gitea
-docker-compose up -d
-
-# Or use the setup script
-bash setup-gitea-ci.sh
+./bootstrap.sh --environment local --components all --domain your-domain.com
 ```
 
-### 3. Import GitHub Repositories
-
+### Hetzner Cloud Deployment
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Run interactive import script
-python gitea-bulk-import.py
+export HETZNER_API_TOKEN=your-token-here
+./bootstrap.sh --environment hetzner --components all --domain your-domain.com
 ```
 
-The script will:
-- Prompt for Gitea API token
-- Prompt for GitHub credentials
-- Let you select which repos to import
-- Import with issues, PRs, and releases
+## Components
 
-## Project Structure
+| Component | Description | Dependencies |
+|-----------|-------------|------------|
+| `base` | K3s cluster setup | None |
+| `storage` | Storage configuration (NAS/Volumes) | base |
+| `secrets` | Sealed Secrets for secure secret management | base |
+| `auth` | Centralized GitHub OAuth authentication | base |
+| `monitoring` | Prometheus, Grafana, Loki, Alertmanager | base, auth |
+| `registry` | Harbor container registry with scanning | base, storage, auth |
+| `npm-registry` | Verdaccio private npm registry | base, storage, auth |
+| `gitea` | Git server with CI/CD runners | base, storage, auth |
+| `k8s-dashboard` | Kubernetes Dashboard | base, auth |
+| `control-panel` | Web management interface | base, auth |
+| `backup` | Velero backup & disaster recovery | base, storage |
+
+## Architecture
 
 ```
-.
-├── gitea-bulk-import.py      # Interactive GitHub import script
-├── docker-compose.yml         # Gitea deployment config
-├── example-workflows/         # CI/CD workflow examples
-│   ├── nextjs-sst.yml
-│   ├── go-service.yml
-│   └── rust-service.yml
-├── setup-scripts/            # Server setup automation
-│   ├── setup-gitea-ci.sh
-│   ├── deploy-cpx11.sh
-│   └── deploy-hetzner.sh
-└── docs/
-    ├── ci-architecture.md
-    └── github-migration.md
+┌─────────────────────────────────────────────┐
+│      GitHub OAuth SSO (root domain)         │
+├─────────────────────────────────────────────┤
+│        Control Panel (root domain)          │
+├─────────────────────────────────────────────┤
+│  git.domain   │  metrics.domain             │
+│  (Gitea)      │  (Grafana)                  │
+├───────────────┼─────────────────────────────┤
+│  npm.domain   │  prometheus.domain          │
+│  (Verdaccio)  │  (Prometheus)               │
+├───────────────┼─────────────────────────────┤
+│registry.domain│  alerts.domain              │
+│  (Harbor)     │  (AlertManager)             │
+├───────────────┼─────────────────────────────┤
+│dashboard.domain│                            │
+│ (K8s Dashboard)│                            │
+├─────────────────────────────────────────────┤
+│         K3s Cluster (Master/Agents)         │
+├─────────────────────────────────────────────┤
+│    Storage Layer (NAS/Volumes/Local)        │
+└─────────────────────────────────────────────┘
 ```
 
-## Configuration
+## Documentation
 
-### Gitea API Access
-1. Visit https://ci.gmac.io/user/settings/applications
-2. Generate new token with `repo` scope
+- [Installation Guide](docs/installation.md)
+- [Component Configuration](docs/components.md)
+- [Monitoring Stack](docs/monitoring.md)
+- [Backup & Disaster Recovery](docs/backup-disaster-recovery.md)
+- [Registry & Secrets Management](docs/registry-secrets.md)
+- [Hetzner Setup](docs/hetzner.md)
+- [Local Homelab Setup](docs/homelab.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
-### GitHub Token (for private repos)
-1. Visit https://github.com/settings/tokens
-2. Create token with `repo` scope
+## Requirements
 
-## Server Details
+- **Local**: Ubuntu 20.04+ or Debian 11+
+- **Hetzner**: CPX11 or higher (2 vCPU, 2GB RAM minimum)
+- **Network**: Public IP or proper NAT configuration
+- **Domain**: For HTTPS access (optional for local)
 
-- **Host**: Hetzner CPX11 (2 vCPU, 2GB RAM, 40GB SSD)
-- **IP**: 5.78.92.8
-- **Domain**: ci.gmac.io
-- **Services**:
-  - Gitea (Git hosting + Web UI)
-  - Gitea Actions (CI/CD runner)
-  - Nginx (reverse proxy + SSL)
+## License
 
-## Maintenance
-
-### Check disk usage
-```bash
-ssh root@ci.gmac.io
-df -h
-docker system df
-```
-
-### Update Gitea
-```bash
-ssh root@ci.gmac.io
-cd /opt/gitea
-docker-compose pull
-docker-compose up -d
-```
-
-### Backup
-```bash
-# Backup Gitea data
-docker exec -u git gitea sh -c 'gitea dump -c /data/gitea/conf/app.ini'
-```
-
-## Support
-
-- Gitea docs: https://docs.gitea.io
-- GitHub migration: See `github-migration.md`
-- Architecture: See `ci-architecture.md`
+MIT

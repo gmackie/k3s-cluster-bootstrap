@@ -1,0 +1,81 @@
+global:
+  resolve_timeout: 5m
+  # Slack webhook URL (replace with your own)
+  # slack_api_url: 'YOUR_SLACK_WEBHOOK_URL'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  
+  routes:
+    # Critical alerts
+    - match:
+        severity: critical
+      receiver: 'critical'
+      repeat_interval: 15m
+    
+    # Database alerts
+    - match:
+        service: database
+      receiver: 'database-team'
+      
+    # Development environment - lower frequency
+    - match:
+        environment: development
+      repeat_interval: 4h
+      receiver: 'dev-team'
+
+# Receivers
+receivers:
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+
+  - name: 'critical'
+    webhook_configs:
+      - url: 'http://localhost:5001/critical'
+        send_resolved: true
+    # Uncomment and configure for email
+    # email_configs:
+    #   - to: 'alerts@gmac.io'
+    #     from: 'prometheus@ci.gmac.io'
+    #     smarthost: 'smtp.gmail.com:587'
+    #     auth_username: 'your-email@gmail.com'
+    #     auth_password: 'your-app-password'
+    #     headers:
+    #       Subject: 'Critical Alert: {{ .GroupLabels.alertname }}'
+
+  - name: 'database-team'
+    webhook_configs:
+      - url: 'http://localhost:5001/database'
+        send_resolved: true
+
+  - name: 'dev-team'
+    webhook_configs:
+      - url: 'http://localhost:5001/dev'
+        send_resolved: true
+
+# Inhibition rules
+inhibit_rules:
+  # Inhibit less severe alerts if critical alert is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+  # Don't alert on individual service if whole node is down
+  - source_match:
+      alertname: 'NodeDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']

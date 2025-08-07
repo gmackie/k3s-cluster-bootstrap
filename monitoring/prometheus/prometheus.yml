@@ -1,0 +1,116 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'gmac-io-monitoring'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules
+rule_files:
+  - "rules/*.yml"
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          instance: 'ci.gmac.io'
+
+  # Docker containers via cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          instance: 'ci.gmac.io'
+
+  # Gitea metrics
+  - job_name: 'gitea'
+    static_configs:
+      - targets: ['gitea:3000']
+        labels:
+          service: 'gitea'
+    metrics_path: '/metrics'
+
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'gitea-db'
+
+  # Blackbox exporter for endpoint monitoring
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://ci.gmac.io
+          - https://k3s.gmac.io
+        labels:
+          type: 'website'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Docker daemon metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['172.17.0.1:9323']
+
+  # Service discovery for Kubernetes (when available)
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+        api_server: 'https://5.78.125.172:6443'
+        tls_config:
+          ca_file: /etc/prometheus/k3s-ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /etc/prometheus/k3s-token
+    scheme: https
+    tls_config:
+      ca_file: /etc/prometheus/k3s-ca.crt
+      insecure_skip_verify: true
+    bearer_token_file: /etc/prometheus/k3s-token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  # Dynamic service discovery for Docker containers
+  - job_name: 'docker-containers'
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      # Only keep containers with prometheus labels
+      - source_labels: [__meta_docker_container_label_prometheus_io_scrape]
+        regex: true
+        action: keep
+      # Use the prometheus.io/port label
+      - source_labels: [__address__, __meta_docker_container_label_prometheus_io_port]
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        target_label: __address__
+        replacement: $1:$2
+      # Set job name from container label
+      - source_labels: [__meta_docker_container_label_prometheus_io_job]
+        target_label: job
+      # Add container name
+      - source_labels: [__meta_docker_container_name]
+        target_label: container_name

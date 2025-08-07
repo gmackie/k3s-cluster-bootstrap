@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oauth2-proxy-config
+  namespace: monitoring
+data:
+  oauth2-proxy.cfg: |
+    http_address = "0.0.0.0:4180"
+    
+    # Provider config
+    provider = "github"
+    github_users = ["gmackie"]
+    email_domains = ["*"]
+    scope = "user:email read:org"
+    
+    # Cookie config - single cookie for all subdomains
+    cookie_name = "_oauth2_proxy"
+    cookie_domains = [".gmac.io"]
+    cookie_secure = true
+    cookie_httponly = true
+    cookie_samesite = "lax"
+    cookie_expire = "168h"
+    
+    # URLs
+    redirect_url = "https://gmac.io/oauth2/callback"
+    whitelist_domains = [".gmac.io"]
+    
+    # Upstream - just return 202 for authenticated requests
+    upstreams = [
+      "static://202"
+    ]
+    
+    # Auth headers
+    set_xauthrequest = true
+    pass_access_token = true
+    pass_user_headers = true
+    pass_host_header = true
+    skip_provider_button = true
+    skip_auth_strip_headers = false
+    
+    # For Grafana auto-login
+    set_authorization_header = true
+    pass_authorization_header = true
