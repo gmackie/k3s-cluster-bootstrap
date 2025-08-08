@@ -37,7 +37,8 @@ Options:
     --environment <local|hetzner>   Deployment environment (default: local)
     --components <list>             Comma-separated list of components or 'all'
                                    Available: base,storage,secrets,auth,monitoring,registry,
-                                            npm-registry,gitea,k8s-dashboard,control-panel,backup
+                                            npm-registry,gitea,k8s-dashboard,matrix,mastodon,
+                                            mumble,jupyterhub,control-panel,backup
     --domain <domain>              Domain name for the cluster (optional)
     --node-type <master|agent>     Node type for multi-node setup (default: master)
     --help                         Show this help message

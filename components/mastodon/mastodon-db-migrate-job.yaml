@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mastodon-db-migrate
+  namespace: mastodon
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: mastodon-db-migrate
+        image: tootsuite/mastodon:latest
+        command: ["bundle", "exec", "rails", "db:migrate"]
+        envFrom:
+        - configMapRef:
+            name: mastodon-env
+        env:
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: postgres-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: redis-password
+        - name: SECRET_KEY_BASE
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: secret-key-base
+        - name: OTP_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: otp-secret

@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: synapse-config
+  namespace: matrix
+data:
+  homeserver.yaml: |
+    server_name: "${DOMAIN}"
+    pid_file: /data/homeserver.pid
+    web_client_location: https://chat.${DOMAIN}
+    public_baseurl: https://matrix.${DOMAIN}
+    
+    listeners:
+      - port: 8008
+        tls: false
+        type: http
+        x_forwarded: true
+        bind_addresses: ['0.0.0.0']
+        resources:
+          - names: [client, federation]
+            compress: false
+    
+    database:
+      name: psycopg2
+      args:
+        user: synapse
+        password: "${MATRIX_POSTGRES_PASSWORD}"
+        database: synapse
+        host: matrix-postgres
+        port: 5432
+        cp_min: 5
+        cp_max: 10
+    
+    log_config: "/data/log.config"
+    media_store_path: "/data/media_store"
+    
+    registration_shared_secret: "${MATRIX_REGISTRATION_SHARED_SECRET}"
+    report_stats: false
+    macaroon_secret_key: "${MATRIX_MACAROON_SECRET_KEY}"
+    form_secret: "${MATRIX_FORM_SECRET}"
+    signing_key_path: "/data/signing.key"
+    
+    trusted_key_servers:
+      - server_name: "matrix.org"
+    
+    # Enable registration for OAuth users
+    enable_registration: true
+    enable_registration_without_verification: true
+    
+    # OAuth2 SSO configuration
+    oidc_providers:
+      - idp_id: github
+        idp_name: "GitHub"
+        issuer: "https://github.com"
+        client_id: "${GITHUB_CLIENT_ID}"
+        client_secret: "${GITHUB_CLIENT_SECRET}"
+        authorization_endpoint: "https://github.com/login/oauth/authorize"
+        token_endpoint: "https://github.com/login/oauth/access_token"
+        userinfo_endpoint: "https://api.github.com/user"
+        scopes: ["read:user", "user:email"]
+        user_mapping_provider:
+          config:
+            subject_claim: "id"
+            localpart_template: "{{ user.login }}"
+            display_name_template: "{{ user.name }}"
+            email_template: "{{ user.email }}"
+    
+    # Federation
+    federation_domain_whitelist: []
+    
+    # URL preview
+    url_preview_enabled: true
+    url_preview_ip_range_blacklist:
+      - '127.0.0.0/8'
+      - '10.0.0.0/8'
+      - '172.16.0.0/12'
+      - '192.168.0.0/16'
+      - '100.64.0.0/10'
+      - '169.254.0.0/16'
+      - '::1/128'
+      - 'fe80::/64'
+      - 'fc00::/7'
+    
+    max_upload_size: "50M"
+    
+    # Retention
+    retention:
+      enabled: true
+      default_policy:
+        min_lifetime: 1d
+        max_lifetime: 365d
+        
+  log.config: |
+    version: 1
+    formatters:
+      precise:
+        format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: precise
+    loggers:
+        synapse.storage.SQL:
+            level: INFO
+    root:
+        level: INFO
+        handlers: [console]
+    disable_existing_loggers: false

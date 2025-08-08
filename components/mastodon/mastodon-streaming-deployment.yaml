@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mastodon-streaming
+  namespace: mastodon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mastodon-streaming
+  template:
+    metadata:
+      labels:
+        app: mastodon-streaming
+    spec:
+      containers:
+      - name: mastodon-streaming
+        image: tootsuite/mastodon:latest
+        command: ["node", "./streaming"]
+        ports:
+        - containerPort: 4000
+          name: streaming
+        envFrom:
+        - configMapRef:
+            name: mastodon-env
+        env:
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: postgres-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: redis-password
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

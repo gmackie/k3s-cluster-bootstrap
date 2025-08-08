@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mastodon-sidekiq
+  namespace: mastodon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mastodon-sidekiq
+  template:
+    metadata:
+      labels:
+        app: mastodon-sidekiq
+    spec:
+      containers:
+      - name: mastodon-sidekiq
+        image: tootsuite/mastodon:latest
+        command: ["bundle", "exec", "sidekiq"]
+        envFrom:
+        - configMapRef:
+            name: mastodon-env
+        env:
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: postgres-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: redis-password
+        - name: SECRET_KEY_BASE
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: secret-key-base
+        - name: OTP_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: otp-secret
+        - name: VAPID_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: vapid-private-key
+        - name: VAPID_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: vapid-public-key
+        volumeMounts:
+        - name: system
+          mountPath: /mastodon/public/system
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: system
+        persistentVolumeClaim:
+          claimName: mastodon-system-pvc

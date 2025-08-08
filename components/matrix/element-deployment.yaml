@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: element
+  namespace: matrix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: element
+  template:
+    metadata:
+      labels:
+        app: element
+    spec:
+      containers:
+      - name: element
+        image: vectorim/element-web:latest
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: element-config
+          mountPath: /app/config.json
+          subPath: config.json
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+      volumes:
+      - name: element-config
+        configMap:
+          name: element-config

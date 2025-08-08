@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mastodon-assets-pvc
+  namespace: mastodon
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mastodon-system-pvc
+  namespace: mastodon
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mastodon-web
+  namespace: mastodon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mastodon-web
+  template:
+    metadata:
+      labels:
+        app: mastodon-web
+    spec:
+      containers:
+      - name: mastodon-web
+        image: tootsuite/mastodon:latest
+        command: ["bash", "-c", "rm -f /mastodon/tmp/pids/server.pid && bundle exec rails s -p 3000"]
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: mastodon-env
+        env:
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: postgres-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: redis-password
+        - name: SECRET_KEY_BASE
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: secret-key-base
+        - name: OTP_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: otp-secret
+        - name: VAPID_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: vapid-private-key
+        - name: VAPID_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mastodon-secrets
+              key: vapid-public-key
+        volumeMounts:
+        - name: assets
+          mountPath: /mastodon/public/assets
+        - name: system
+          mountPath: /mastodon/public/system
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: assets
+        persistentVolumeClaim:
+          claimName: mastodon-assets-pvc
+      - name: system
+        persistentVolumeClaim:
+          claimName: mastodon-system-pvc

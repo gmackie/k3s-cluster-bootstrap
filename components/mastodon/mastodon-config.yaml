@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mastodon-env
+  namespace: mastodon
+data:
+  # Basic configuration
+  RAILS_ENV: "production"
+  NODE_ENV: "production"
+  LOCAL_DOMAIN: "social.${DOMAIN}"
+  WEB_DOMAIN: "social.${DOMAIN}"
+  SINGLE_USER_MODE: "false"
+  
+  # Database configuration
+  DB_HOST: "mastodon-postgres"
+  DB_PORT: "5432"
+  DB_NAME: "mastodon_production"
+  DB_USER: "mastodon"
+  
+  # Redis configuration
+  REDIS_HOST: "mastodon-redis"
+  REDIS_PORT: "6379"
+  
+  # Storage configuration
+  S3_ENABLED: "false"
+  
+  # Email configuration (configure as needed)
+  SMTP_SERVER: "smtp.gmail.com"
+  SMTP_PORT: "587"
+  SMTP_LOGIN: ""
+  SMTP_PASSWORD: ""
+  SMTP_FROM_ADDRESS: "notifications@social.${DOMAIN}"
+  
+  # Federation
+  FEDERATION_ENABLED: "true"
+  
+  # Streaming
+  STREAMING_API_BASE_URL: "wss://social.${DOMAIN}"
+  
+  # OAuth (GitHub)
+  OAUTH_REDIRECT_AT_SIGN_IN: "true"

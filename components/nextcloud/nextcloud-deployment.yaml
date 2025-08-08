@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud
+  namespace: nextcloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nextcloud
+  template:
+    metadata:
+      labels:
+        app: nextcloud
+    spec:
+      containers:
+      - name: nextcloud
+        image: nextcloud:28-apache
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        # Database configuration
+        - name: POSTGRES_HOST
+          value: "nextcloud-postgres"
+        - name: POSTGRES_DB
+          value: "nextcloud"
+        - name: POSTGRES_USER
+          value: "nextcloud"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: nextcloud-secrets
+              key: database-password
+        # Redis configuration
+        - name: REDIS_HOST
+          value: "nextcloud-redis"
+        - name: REDIS_HOST_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: nextcloud-secrets
+              key: redis-password
+        # Nextcloud configuration
+        - name: NEXTCLOUD_ADMIN_USER
+          value: "admin"
+        - name: NEXTCLOUD_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: nextcloud-secrets
+              key: admin-password
+        - name: NEXTCLOUD_TRUSTED_DOMAINS
+          value: "files.${DOMAIN}"
+        - name: OVERWRITEHOST
+          value: "files.${DOMAIN}"
+        - name: OVERWRITEPROTOCOL
+          value: "https"
+        - name: OVERWRITECLIURL
+          value: "https://files.${DOMAIN}"
+        - name: TRUSTED_PROXIES
+          value: "10.0.0.0/8"
+        # S3 primary storage (MinIO)
+        - name: OBJECTSTORE_S3_BUCKET
+          value: "nextcloud"
+        - name: OBJECTSTORE_S3_AUTOCREATE
+          value: "true"
+        - name: OBJECTSTORE_S3_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nextcloud-secrets
+              key: s3-access-key
+        - name: OBJECTSTORE_S3_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: nextcloud-secrets
+              key: s3-secret-key
+        - name: OBJECTSTORE_S3_HOST
+          value: "minio.minio.svc.cluster.local"
+        - name: OBJECTSTORE_S3_PORT
+          value: "9000"
+        - name: OBJECTSTORE_S3_SSL
+          value: "false"
+        - name: OBJECTSTORE_S3_USEPATH_STYLE
+          value: "true"
+        # PHP configuration
+        - name: PHP_MEMORY_LIMIT
+          value: "512M"
+        - name: PHP_UPLOAD_LIMIT
+          value: "10G"
+        volumeMounts:
+        - name: nextcloud-data
+          mountPath: /var/www/html
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /status.php
+            port: 80
+            httpHeaders:
+            - name: Host
+              value: "files.${DOMAIN}"
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /status.php
+            port: 80
+            httpHeaders:
+            - name: Host
+              value: "files.${DOMAIN}"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: nextcloud-data
+        persistentVolumeClaim:
+          claimName: nextcloud-data
+      - name: tmp
+        emptyDir: {}

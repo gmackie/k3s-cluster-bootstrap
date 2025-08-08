@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vaultwarden
+  template:
+    metadata:
+      labels:
+        app: vaultwarden
+    spec:
+      containers:
+      - name: vaultwarden
+        image: vaultwarden/server:latest
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 3012
+          name: websocket
+        env:
+        - name: DOMAIN
+          value: "https://vault.${DOMAIN}"
+        - name: SIGNUPS_ALLOWED
+          value: "false"
+        - name: INVITATIONS_ALLOWED
+          value: "true"
+        - name: ADMIN_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vaultwarden-secrets
+              key: admin-token
+        - name: DATABASE_URL
+          value: "postgresql://vaultwarden:$(DATABASE_PASSWORD)@vaultwarden-postgres:5432/vaultwarden"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vaultwarden-secrets
+              key: database-password
+        - name: ENABLE_DB_WAL
+          value: "false"
+        - name: WEBSOCKET_ENABLED
+          value: "true"
+        - name: WEB_VAULT_ENABLED
+          value: "true"
+        - name: SENDS_ALLOWED
+          value: "true"
+        - name: EMERGENCY_ACCESS_ALLOWED
+          value: "true"
+        - name: ORGANIZATIONS_ALLOWED
+          value: "true"
+        - name: SMTP_HOST
+          value: "${SMTP_HOST:-}"
+        - name: SMTP_FROM
+          value: "${SMTP_FROM:-noreply@${DOMAIN}}"
+        - name: SMTP_PORT
+          value: "${SMTP_PORT:-587}"
+        - name: SMTP_SECURITY
+          value: "${SMTP_SECURITY:-starttls}"
+        - name: SMTP_USERNAME
+          value: "${SMTP_USERNAME:-}"
+        - name: SMTP_PASSWORD
+          value: "${SMTP_PASSWORD:-}"
+        - name: SHOW_PASSWORD_HINT
+          value: "false"
+        - name: ROCKET_PORT
+          value: "80"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: vaultwarden-data

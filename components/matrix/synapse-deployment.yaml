@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: synapse-data-pvc
+  namespace: matrix
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synapse
+  namespace: matrix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: synapse
+  template:
+    metadata:
+      labels:
+        app: synapse
+    spec:
+      initContainers:
+      - name: generate-config
+        image: matrixdotorg/synapse:latest
+        command: 
+        - sh
+        - -c
+        - |
+          if [ ! -f /data/homeserver.yaml ]; then
+            cp /config/homeserver.yaml /data/homeserver.yaml
+            python -m synapse.app.homeserver --config-path=/data/homeserver.yaml --generate-keys
+          fi
+          chown -R 991:991 /data
+        volumeMounts:
+        - name: synapse-data
+          mountPath: /data
+        - name: synapse-config
+          mountPath: /config
+        env:
+        - name: MATRIX_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: matrix-secrets
+              key: postgres-password
+        - name: MATRIX_REGISTRATION_SHARED_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: matrix-secrets
+              key: registration-shared-secret
+        - name: MATRIX_MACAROON_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: matrix-secrets
+              key: macaroon-secret-key
+        - name: MATRIX_FORM_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: matrix-secrets
+              key: form-secret
+      containers:
+      - name: synapse
+        image: matrixdotorg/synapse:latest
+        ports:
+        - containerPort: 8008
+          name: http
+        volumeMounts:
+        - name: synapse-data
+          mountPath: /data
+        env:
+        - name: SYNAPSE_CONFIG_PATH
+          value: /data/homeserver.yaml
+        - name: UID
+          value: "991"
+        - name: GID
+          value: "991"
+        livenessProbe:
+          httpGet:
+            path: /_matrix/client/versions
+            port: 8008
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_matrix/client/versions
+            port: 8008
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: synapse-data
+        persistentVolumeClaim:
+          claimName: synapse-data-pvc
+      - name: synapse-config
+        configMap:
+          name: synapse-config

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mumble-web
+  namespace: mumble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mumble-web
+  template:
+    metadata:
+      labels:
+        app: mumble-web
+    spec:
+      containers:
+      - name: mumble-web
+        image: rankenstein/mumble-web:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: MUMBLE_SERVER
+          value: mumble.mumble.svc.cluster.local:64738
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drone-server
+  namespace: drone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drone-server
+  template:
+    metadata:
+      labels:
+        app: drone-server
+    spec:
+      containers:
+      - name: drone-server
+        image: drone/drone:2
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 443
+          name: https
+        env:
+        # Gitea Config
+        - name: DRONE_GITEA_SERVER
+          value: "https://git.${DOMAIN}"
+        - name: DRONE_GITEA_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: drone-secrets
+              key: gitea-client-id
+        - name: DRONE_GITEA_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: drone-secrets
+              key: gitea-client-secret
+        - name: DRONE_GIT_ALWAYS_AUTH
+          value: "true"
+        
+        # Server Config
+        - name: DRONE_SERVER_HOST
+          value: "ci.${DOMAIN}"
+        - name: DRONE_SERVER_PROTO
+          value: "https"
+        - name: DRONE_RPC_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: drone-secrets
+              key: rpc-secret
+        
+        # Database Config
+        - name: DRONE_DATABASE_DRIVER
+          value: "postgres"
+        - name: DRONE_DATABASE_DATASOURCE
+          value: "postgres://drone:$(DATABASE_PASSWORD)@drone-postgres:5432/drone?sslmode=disable"
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: drone-secrets
+              key: database-password
+        
+        # User Config
+        - name: DRONE_USER_CREATE
+          value: "username:${GITHUB_USER:-admin},admin:true"
+        - name: DRONE_USER_FILTER
+          value: "${GITHUB_ORG:-}"
+        
+        # Webhook Config
+        - name: DRONE_WEBHOOK_SKIP_VERIFY
+          value: "false"
+        
+        # Logs
+        - name: DRONE_LOGS_DEBUG
+          value: "false"
+        - name: DRONE_LOGS_TRACE
+          value: "false"
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

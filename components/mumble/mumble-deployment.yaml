@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mumble-data-pvc
+  namespace: mumble
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mumble
+  namespace: mumble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mumble
+  template:
+    metadata:
+      labels:
+        app: mumble
+    spec:
+      containers:
+      - name: mumble
+        image: mumblevoip/mumble-server:latest
+        ports:
+        - containerPort: 64738
+          protocol: TCP
+          name: tcp
+        - containerPort: 64738
+          protocol: UDP
+          name: udp
+        volumeMounts:
+        - name: mumble-data
+          mountPath: /var/lib/mumble
+        - name: mumble-config
+          mountPath: /etc/mumble
+        env:
+        - name: MUMBLE_CONFIG
+          value: /etc/mumble/mumble.ini
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: mumble-data
+        persistentVolumeClaim:
+          claimName: mumble-data-pvc
+      - name: mumble-config
+        configMap:
+          name: mumble-config

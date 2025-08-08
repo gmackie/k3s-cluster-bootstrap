@@ -154,6 +154,10 @@ When deployed with a domain, services are available at:
 - **Harbor Registry**: `https://registry.<domain>`
 - **NPM Registry**: `https://npm.<domain>`
 - **K8s Dashboard**: `https://dashboard.<domain>`
+- **Matrix/Element**: `https://matrix.<domain>` / `https://chat.<domain>`
+- **Mastodon**: `https://social.<domain>`
+- **Mumble Web**: `https://voice.<domain>` (server: voice.<domain>:64738)
+- **JupyterHub**: `https://notebook.<domain>`
 
 All services use GitHub OAuth for authentication through the centralized auth component.
 

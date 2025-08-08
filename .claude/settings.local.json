@@ -40,7 +40,8 @@
       "Bash(docker tag:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   },

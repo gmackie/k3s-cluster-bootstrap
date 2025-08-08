@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mumble-config
+  namespace: mumble
+data:
+  mumble.ini: |
+    # Murmur configuration
+    database=/var/lib/mumble/mumble.sqlite
+    logfile=/var/log/mumble/mumble.log
+    pidfile=/var/run/mumble/mumble.pid
+    
+    # Welcome message
+    welcometext="<br />Welcome to <b>GMAC.io Mumble Server</b><br />Enjoy your voice chat!<br />"
+    
+    # Server settings
+    port=64738
+    bandwidth=72000
+    users=100
+    
+    # Security
+    serverpassword=
+    allowping=true
+    
+    # Registration
+    registerName=GMAC.io Mumble
+    registerUrl=https://voice.${DOMAIN}
+    registerHostname=voice.${DOMAIN}
+    
+    # Permissions
+    autobanAttempts=10
+    autobanTimeframe=120
+    autobanTime=300
+    
+    # Audio quality
+    opusthreshold=100
+    
+    # Allow HTML in messages
+    allowhtml=true
+    
+    # SSL/TLS
+    sslCert=/etc/mumble/fullchain.pem
+    sslKey=/etc/mumble/privkey.pem

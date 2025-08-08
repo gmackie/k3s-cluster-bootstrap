@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nextcloud-cron
+  namespace: nextcloud
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: nextcloud-cron
+            image: nextcloud:28-apache
+            command:
+            - /bin/sh
+            - -c
+            - |
+              php -f /var/www/html/cron.php
+            env:
+            - name: POSTGRES_HOST
+              value: "nextcloud-postgres"
+            - name: POSTGRES_DB
+              value: "nextcloud"
+            - name: POSTGRES_USER
+              value: "nextcloud"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-secrets
+                  key: database-password
+            volumeMounts:
+            - name: nextcloud-data
+              mountPath: /var/www/html
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          volumes:
+          - name: nextcloud-data
+            persistentVolumeClaim:
+              claimName: nextcloud-data
