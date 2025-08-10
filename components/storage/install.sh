@@ -14,6 +14,11 @@ case $STORAGE_TYPE in
         info "Configuring local storage..."
         configure_local_storage
         ;;
+    longhorn)
+        info "Longhorn will be installed as a separate component..."
+        configure_local_storage  # Use local-path as temporary default
+        info "Run './bootstrap.sh --components longhorn' to install Longhorn distributed storage"
+        ;;
     nfs)
         info "Configuring NFS storage..."
         configure_nfs_storage

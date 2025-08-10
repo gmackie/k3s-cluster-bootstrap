@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-worker
+  namespace: authentik
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: authentik-worker
+  template:
+    metadata:
+      labels:
+        app: authentik-worker
+    spec:
+      containers:
+      - name: authentik-worker
+        image: ghcr.io/goauthentik/server:2023.10.5
+        command:
+        - dumb-init
+        - ak
+        - worker
+        envFrom:
+        - configMapRef:
+            name: authentik-config
+        env:
+        - name: AUTHENTIK_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: authentik-secrets
+              key: secret-key
+        - name: AUTHENTIK_POSTGRESQL__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: authentik-secrets
+              key: postgres-password
+        - name: AUTHENTIK_REDIS__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: authentik-secrets
+              key: redis-password
+        - name: AUTHENTIK_EMAIL__PASSWORD
+          value: "${SMTP_PASSWORD:-}"
+        volumeMounts:
+        - name: media
+          mountPath: /media
+        - name: certs
+          mountPath: /certs
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: media
+        persistentVolumeClaim:
+          claimName: authentik-media
+      - name: certs
+        emptyDir: {}

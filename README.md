@@ -11,6 +11,7 @@ A modular, production-ready Kubernetes cluster deployment system built on K3s wi
 - 🎛️ **Control Panel**: Web-based cluster management interface
 - 💾 **Flexible Storage**: Local-path, NAS, S3-compatible (MinIO)
 - 🔐 **Centralized Auth**: GitHub OAuth SSO across all services
+- 🆔 **Identity Provider**: Authentik for OAuth2, SAML, LDAP support
 - 🔐 **Backup & DR**: Automated backups with Velero
 - 🐳 **Container Registry**: Harbor with vulnerability scanning
 - 📦 **NPM Registry**: Private package registry with Verdaccio
@@ -50,8 +51,10 @@ export HETZNER_API_TOKEN=your-token-here
 |-----------|-------------|------------|
 | `base` | K3s cluster setup, ingress, cert-manager | None |
 | `storage` | Storage classes and provisioners | base |
+| `longhorn` | Distributed block storage system | base, storage |
 | `secrets` | Sealed Secrets for secure secret management | base |
 | `auth` | Centralized GitHub OAuth authentication | base |
+| `authentik` | Advanced identity provider (OAuth2, SAML, LDAP) | base, storage |
 | `monitoring` | Prometheus, Grafana, Loki, Alertmanager | base, auth |
 | `registry` | Harbor container registry with scanning | base, storage, auth |
 | `npm-registry` | Verdaccio private npm registry | base, storage, auth |

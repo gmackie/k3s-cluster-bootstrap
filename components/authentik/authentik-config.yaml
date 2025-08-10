@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authentik-config
+  namespace: authentik
+data:
+  AUTHENTIK_REDIS__HOST: "authentik-redis"
+  AUTHENTIK_REDIS__PORT: "6379"
+  AUTHENTIK_POSTGRESQL__HOST: "authentik-postgres"
+  AUTHENTIK_POSTGRESQL__PORT: "5432"
+  AUTHENTIK_POSTGRESQL__NAME: "authentik"
+  AUTHENTIK_POSTGRESQL__USER: "authentik"
+  AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+  AUTHENTIK_LOG_LEVEL: "info"
+  AUTHENTIK_OUTPOSTS__CONTAINER_IMAGE_BASE: "ghcr.io/goauthentik/%(type)s:%(version)s"
+  AUTHENTIK_AVATARS: "initials"
+  AUTHENTIK_FOOTER_LINKS: '[{"name": "Documentation", "href": "https://goauthentik.io/docs/"}]'
+  # Email configuration
+  AUTHENTIK_EMAIL__HOST: "${SMTP_HOST:-localhost}"
+  AUTHENTIK_EMAIL__PORT: "${SMTP_PORT:-25}"
+  AUTHENTIK_EMAIL__USERNAME: "${SMTP_USERNAME:-}"
+  AUTHENTIK_EMAIL__USE_TLS: "${SMTP_USE_TLS:-false}"
+  AUTHENTIK_EMAIL__USE_SSL: "false"
+  AUTHENTIK_EMAIL__FROM: "${SMTP_FROM:-authentik@${DOMAIN}}"
