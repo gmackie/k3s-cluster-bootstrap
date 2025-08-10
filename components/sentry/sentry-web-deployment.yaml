@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sentry-data
+  namespace: sentry
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentry-web
+  namespace: sentry
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sentry-web
+  template:
+    metadata:
+      labels:
+        app: sentry-web
+    spec:
+      initContainers:
+      - name: sentry-init
+        image: sentry:24.1.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          sentry upgrade --noinput
+          sentry createuser --email ${ADMIN_EMAIL} --password ${ADMIN_PASSWORD} --superuser --no-input || true
+        env:
+        - name: SENTRY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: secret-key
+        - name: SENTRY_DB_NAME
+          value: "sentry"
+        - name: SENTRY_DB_USER
+          value: "sentry"
+        - name: SENTRY_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: postgres-password
+        - name: SENTRY_POSTGRES_HOST
+          value: "sentry-postgres"
+        - name: SENTRY_REDIS_HOST
+          value: "sentry-redis"
+        - name: ADMIN_EMAIL
+          value: "admin@${DOMAIN}"
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: admin-password
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sentry
+        - name: data
+          mountPath: /data
+      containers:
+      - name: sentry-web
+        image: sentry:24.1.0
+        ports:
+        - containerPort: 9000
+          name: http
+        env:
+        - name: SENTRY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: secret-key
+        - name: SENTRY_DB_NAME
+          value: "sentry"
+        - name: SENTRY_DB_USER
+          value: "sentry"
+        - name: SENTRY_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: postgres-password
+        - name: SENTRY_POSTGRES_HOST
+          value: "sentry-postgres"
+        - name: SENTRY_REDIS_HOST
+          value: "sentry-redis"
+        - name: SENTRY_SERVER_EMAIL
+          value: "sentry@${DOMAIN}"
+        - name: SENTRY_EMAIL_HOST
+          value: "${SMTP_HOST:-localhost}"
+        - name: SENTRY_EMAIL_PORT
+          value: "${SMTP_PORT:-25}"
+        - name: SENTRY_EMAIL_USER
+          value: "${SMTP_USERNAME:-}"
+        - name: SENTRY_EMAIL_PASSWORD
+          value: "${SMTP_PASSWORD:-}"
+        - name: SENTRY_EMAIL_USE_TLS
+          value: "${SMTP_USE_TLS:-false}"
+        - name: GITHUB_CLIENT_ID
+          value: "${GITHUB_CLIENT_ID:-}"
+        - name: GITHUB_CLIENT_SECRET
+          value: "${GITHUB_CLIENT_SECRET:-}"
+        - name: GITHUB_ORG
+          value: "${GITHUB_ORG:-}"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: postgres-password
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sentry
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /_health/
+            port: 9000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_health/
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: sentry-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: sentry-data

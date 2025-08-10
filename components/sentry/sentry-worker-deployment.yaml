@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentry-worker
+  namespace: sentry
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sentry-worker
+  template:
+    metadata:
+      labels:
+        app: sentry-worker
+    spec:
+      containers:
+      - name: sentry-worker
+        image: sentry:24.1.0
+        command: ["sentry", "run", "worker"]
+        env:
+        - name: SENTRY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: secret-key
+        - name: SENTRY_DB_NAME
+          value: "sentry"
+        - name: SENTRY_DB_USER
+          value: "sentry"
+        - name: SENTRY_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: postgres-password
+        - name: SENTRY_POSTGRES_HOST
+          value: "sentry-postgres"
+        - name: SENTRY_REDIS_HOST
+          value: "sentry-redis"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sentry-secrets
+              key: postgres-password
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sentry
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: config
+        configMap:
+          name: sentry-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: sentry-data

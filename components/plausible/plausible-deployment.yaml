@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plausible
+  namespace: plausible
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plausible
+  template:
+    metadata:
+      labels:
+        app: plausible
+    spec:
+      initContainers:
+      - name: plausible-init
+        image: plausible/analytics:v2.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          /app/bin/plausible eval "Plausible.Release.prepare()"
+          /app/bin/plausible eval "Plausible.Release.createdb()"
+          /app/bin/plausible eval "Plausible.Release.migrate()"
+          /app/bin/plausible eval "Plausible.Release.init_admin()"
+        env:
+        - name: DATABASE_URL
+          value: "postgres://plausible:$(POSTGRES_PASSWORD)@plausible-postgres:5432/plausible"
+        - name: CLICKHOUSE_DATABASE_URL
+          value: "http://plausible:$(CLICKHOUSE_PASSWORD)@plausible-clickhouse:8123/plausible"
+        - name: SECRET_KEY_BASE
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secrets
+              key: secret-key-base
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secrets
+              key: postgres-password
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secrets
+              key: clickhouse-password
+      containers:
+      - name: plausible
+        image: plausible/analytics:v2.0
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: BASE_URL
+          value: "https://analytics.${DOMAIN}"
+        - name: DATABASE_URL
+          value: "postgres://plausible:$(POSTGRES_PASSWORD)@plausible-postgres:5432/plausible"
+        - name: CLICKHOUSE_DATABASE_URL
+          value: "http://plausible:$(CLICKHOUSE_PASSWORD)@plausible-clickhouse:8123/plausible"
+        - name: SECRET_KEY_BASE
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secrets
+              key: secret-key-base
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secrets
+              key: postgres-password
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: plausible-secrets
+              key: clickhouse-password
+        - name: DISABLE_REGISTRATION
+          value: "true"
+        - name: MAILER_EMAIL
+          value: "${SMTP_FROM:-analytics@${DOMAIN}}"
+        - name: SMTP_HOST_ADDR
+          value: "${SMTP_HOST:-localhost}"
+        - name: SMTP_HOST_PORT
+          value: "${SMTP_PORT:-25}"
+        - name: SMTP_USER_NAME
+          value: "${SMTP_USERNAME:-}"
+        - name: SMTP_USER_PWD
+          value: "${SMTP_PASSWORD:-}"
+        - name: SMTP_HOST_SSL_ENABLED
+          value: "${SMTP_USE_TLS:-false}"
+        - name: GOOGLE_CLIENT_ID
+          value: "${GOOGLE_CLIENT_ID:-}"
+        - name: GOOGLE_CLIENT_SECRET
+          value: "${GOOGLE_CLIENT_SECRET:-}"
+        - name: MAXMIND_LICENSE_KEY
+          value: "${MAXMIND_LICENSE_KEY:-}"
+        - name: MAXMIND_EDITION
+          value: "GeoLite2-City"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10

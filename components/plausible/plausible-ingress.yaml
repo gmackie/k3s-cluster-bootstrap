@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: plausible
+  namespace: plausible
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # OAuth2 authentication for dashboard
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth-system.svc.cluster.local:4180/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://${DOMAIN}/oauth2/start?rd=$scheme://$host$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email"
+    # Allow tracking script and API without auth
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      location ~ ^/(js/script|api/event) {
+        proxy_pass http://upstream_balancer;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # CORS headers for tracking script
+        add_header Access-Control-Allow-Origin *;
+        add_header Access-Control-Allow-Methods "POST, GET, OPTIONS";
+        add_header Access-Control-Allow-Headers "Content-Type";
+        
+        if ($request_method = OPTIONS) {
+          return 204;
+        }
+      }
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - analytics.${DOMAIN}
+    secretName: plausible-tls
+  rules:
+  - host: analytics.${DOMAIN}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: plausible
+            port:
+              number: 8000

@@ -61,6 +61,8 @@ export HETZNER_API_TOKEN=your-token-here
 | `vaultwarden` | Password manager (Bitwarden compatible) | base, storage, auth |
 | `minio` | S3-compatible object storage | base, storage |
 | `nextcloud` | File sync and collaboration | base, storage, auth, minio (optional) |
+| `sentry` | Application error tracking and monitoring | base, storage, auth |
+| `plausible` | Privacy-focused web analytics | base, storage, auth |
 | `matrix` | Matrix chat server with Element web client | base, storage, auth |
 | `mastodon` | Federated social network | base, storage, auth |
 | `mumble` | Voice chat server with web interface | base, auth |
@@ -87,6 +89,9 @@ export HETZNER_API_TOKEN=your-token-here
 ├───────────────┼─────────────────────────────┤
 │  s3.domain    │  files.domain               │
 │  (MinIO)      │  (Nextcloud)                │
+├───────────────┼─────────────────────────────┤
+│sentry.domain  │  analytics.domain           │
+│  (Sentry)     │  (Plausible)                │
 ├───────────────┼─────────────────────────────┤
 │dashboard.domain│  notebook.domain           │
 │ (K8s Dashboard)│  (JupyterHub)              │
@@ -132,14 +137,11 @@ The cluster includes several collaboration and communication services:
 
 ## Documentation
 
-- [Installation Guide](docs/installation.md)
-- [Component Configuration](docs/components.md)
+- [Deployment Guide](docs/deployment-guide.md) - Complete step-by-step deployment instructions
 - [Monitoring Stack](docs/monitoring.md)
 - [Backup & Disaster Recovery](docs/backup-disaster-recovery.md)
 - [Registry & Secrets Management](docs/registry-secrets.md)
-- [Hetzner Setup](docs/hetzner.md)
-- [Local Homelab Setup](docs/homelab.md)
-- [Troubleshooting](docs/troubleshooting.md)
+- [Hybrid Infrastructure](docs/hybrid-infrastructure.md)
 
 ## Requirements
 

@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentry-config
+  namespace: sentry
+data:
+  config.yml: |
+    # Sentry configuration
+    system.url-prefix: 'https://sentry.${DOMAIN}'
+    
+    # Mail configuration
+    mail.backend: 'smtp'
+    mail.host: '${SMTP_HOST:-localhost}'
+    mail.port: ${SMTP_PORT:-25}
+    mail.username: '${SMTP_USERNAME:-}'
+    mail.password: '${SMTP_PASSWORD:-}'
+    mail.use-tls: ${SMTP_USE_TLS:-false}
+    mail.from: '${SMTP_FROM:-sentry@${DOMAIN}}'
+    
+    # Redis configuration
+    redis.clusters:
+      default:
+        hosts:
+          0:
+            host: sentry-redis
+            port: 6379
+    
+    # File storage
+    filestore.backend: 'filesystem'
+    filestore.options:
+      location: '/data/files'
+    
+    # Features
+    auth.allow-registration: false
+    beacon.anonymous: true
+    
+  sentry.conf.py: |
+    from sentry.conf.server import *
+    import os
+    
+    DATABASES = {
+        'default': {
+            'ENGINE': 'sentry.db.postgres',
+            'NAME': 'sentry',
+            'USER': 'sentry',
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
+            'HOST': 'sentry-postgres',
+            'PORT': '5432',
+        }
+    }
+    
+    SENTRY_SINGLE_ORGANIZATION = True
+    SENTRY_OPTIONS['system.url-prefix'] = 'https://sentry.${DOMAIN}'
+    
+    # Security
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
+    
+    # GitHub OAuth (if configured)
+    if os.environ.get('GITHUB_CLIENT_ID'):
+        GITHUB_APP_ID = os.environ.get('GITHUB_CLIENT_ID')
+        GITHUB_API_SECRET = os.environ.get('GITHUB_CLIENT_SECRET')
+        GITHUB_REQUIRE_VERIFIED_EMAIL = True
+        GITHUB_BASE_DOMAIN = 'github.com'
+        GITHUB_ORGANIZATION = os.environ.get('GITHUB_ORG', '')
+    
+    # Performance
+    SENTRY_OPTIONS['system.rate-limit'] = 500
+    SENTRY_METRICS_OPTIONS['sample_rate'] = 0.1
+    
+    # File upload limits
+    SENTRY_OPTIONS['system.maximum-file-size'] = 50 * 1024 * 1024  # 50MB
+    
+    # Symbolicator for native crash processing
+    SENTRY_OPTIONS['symbolicator.enabled'] = True
+    SENTRY_OPTIONS['symbolicator.options'] = {
+        'url': 'http://sentry-symbolicator:3021',
+    }
