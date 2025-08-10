@@ -166,6 +166,16 @@ The cluster includes several collaboration and communication services:
 - **Network**: Public IP or proper NAT configuration
 - **Domain**: For HTTPS access (optional for local)
 
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Support
+
+- 📖 [Documentation](docs/)
+- 🐛 [Issue Tracker](https://github.com/yourusername/k3s-cluster-bootstrap/issues)
+- 💬 [Discussions](https://github.com/yourusername/k3s-cluster-bootstrap/discussions)
+
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE) for details
