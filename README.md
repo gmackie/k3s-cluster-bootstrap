@@ -2,6 +2,15 @@
 
 A modular, production-ready Kubernetes cluster deployment system built on K3s with integrated CI/CD, monitoring, and collaboration tools.
 
+## 🚀 Quick Start
+
+```bash
+# Run the interactive setup wizard
+./setup-wizard.sh
+```
+
+The wizard will guide you through the entire setup process and deploy your cluster automatically! See [Quick Start Guide](docs/QUICKSTART.md) for detailed instructions.
+
 ## Features
 
 - 🚀 **Multi-Environment Support**: Deploy to local homelab or Hetzner Cloud
@@ -142,11 +151,13 @@ The cluster includes several collaboration and communication services:
 
 ## Documentation
 
+- [Quick Start Guide](docs/QUICKSTART.md) - Get up and running in 5 minutes
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Deployment Guide](docs/deployment-guide.md) - Complete step-by-step deployment instructions
-- [Monitoring Stack](docs/monitoring.md)
-- [Backup & Disaster Recovery](docs/backup-disaster-recovery.md)
-- [Registry & Secrets Management](docs/registry-secrets.md)
-- [Hybrid Infrastructure](docs/hybrid-infrastructure.md)
+- [Monitoring Stack](docs/monitoring.md) - Prometheus, Grafana, and alerting setup
+- [Backup & Disaster Recovery](docs/backup-disaster-recovery.md) - Backup strategies and recovery procedures
+- [Registry & Secrets Management](docs/registry-secrets.md) - Harbor registry and sealed secrets
+- [Hybrid Infrastructure](docs/hybrid-infrastructure.md) - Multi-cloud deployment patterns
 
 ## Requirements
 

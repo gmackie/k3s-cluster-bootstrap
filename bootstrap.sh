@@ -7,11 +7,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
-# Default values
-ENVIRONMENT="local"
-COMPONENTS=""
-DOMAIN=""
-NODE_TYPE="master"
+# Load environment file if exists
+if [[ -f "${SCRIPT_DIR}/.env" ]]; then
+    info "Loading configuration from .env file"
+    source "${SCRIPT_DIR}/.env"
+fi
+
+# Default values (after loading .env)
+ENVIRONMENT="${ENVIRONMENT:-local}"
+COMPONENTS="${COMPONENTS:-}"
+DOMAIN="${DOMAIN:-}"
+NODE_TYPE="${NODE_TYPE:-master}"
 HETZNER_API_TOKEN="${HETZNER_API_TOKEN:-}"
 
 # Parse command line arguments
@@ -46,13 +52,25 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate environment
-if [[ "$ENVIRONMENT" != "local" && "$ENVIRONMENT" != "hetzner" ]]; then
-    error "Invalid environment: $ENVIRONMENT. Must be 'local' or 'hetzner'"
+if [[ "$ENVIRONMENT" != "local" && "$ENVIRONMENT" != "hetzner" && "$ENVIRONMENT" != "vps" ]]; then
+    error "Invalid environment: $ENVIRONMENT. Must be 'local', 'hetzner', or 'vps'"
 fi
 
 # Validate Hetzner requirements
 if [[ "$ENVIRONMENT" == "hetzner" && -z "$HETZNER_API_TOKEN" ]]; then
     error "HETZNER_API_TOKEN environment variable is required for Hetzner deployment"
+fi
+
+# Validate VPS requirements
+if [[ "$ENVIRONMENT" == "vps" && -z "$SERVER_IP" ]]; then
+    error "SERVER_IP environment variable is required for VPS deployment"
+fi
+
+# Validate domain if provided
+if [[ -n "$DOMAIN" ]]; then
+    info "Using domain: $DOMAIN"
+else
+    warn "No domain specified. Some features may not be available."
 fi
 
 # Parse components
@@ -68,6 +86,7 @@ info "Components: ${COMPONENT_ARRAY[*]}"
 info "Domain: ${DOMAIN:-Not specified}"
 
 # Run environment-specific setup
+info "Setting up $ENVIRONMENT environment"
 case $ENVIRONMENT in
     local)
         source "${SCRIPT_DIR}/environments/local/setup.sh"
@@ -75,25 +94,67 @@ case $ENVIRONMENT in
     hetzner)
         source "${SCRIPT_DIR}/environments/hetzner/setup.sh"
         ;;
+    vps)
+        # For VPS, we assume K3s is already installed or will be installed manually
+        info "VPS deployment: Ensure K3s is installed on $SERVER_IP"
+        ;;
 esac
 
 # Install components in order
+info "Installing ${#COMPONENT_ARRAY[@]} components"
 for component in "${COMPONENT_ARRAY[@]}"; do
     info "Installing component: $component"
     
     if [[ -f "${SCRIPT_DIR}/components/${component}/install.sh" ]]; then
+        # Export common variables for component scripts
+        export DOMAIN ENVIRONMENT ADMIN_EMAIL DEFAULT_STORAGE_CLASS
+        export GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET GITHUB_ORG
+        export SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD SMTP_USE_TLS SMTP_FROM
+        
         source "${SCRIPT_DIR}/components/${component}/install.sh"
+        success "Component $component installed successfully"
     else
         error "Component script not found: $component"
     fi
 done
 
-info "Bootstrap complete!"
-info "Access your cluster:"
+# Run control panel configuration if installed
+if [[ " ${COMPONENT_ARRAY[@]} " =~ " control-panel " ]]; then
+    info "Configuring control panel with discovered services"
+    if [[ -f "${SCRIPT_DIR}/components/control-panel/generate-config.sh" ]]; then
+        bash "${SCRIPT_DIR}/components/control-panel/generate-config.sh"
+    fi
+fi
+
+success "\n🎉 Bootstrap complete!"
+info "\nAccess your services:"
 if [[ -n "$DOMAIN" ]]; then
-    info "  Control Panel: https://$DOMAIN"
-    info "  Gitea: https://$DOMAIN/git"
-    info "  Grafana: https://$DOMAIN/grafana"
+    if [[ " ${COMPONENT_ARRAY[@]} " =~ " control-panel " ]]; then
+        info "  🏠 Control Panel: https://$DOMAIN"
+    fi
+    if [[ " ${COMPONENT_ARRAY[@]} " =~ " gitea " ]]; then
+        info "  📦 Git Repository: https://git.$DOMAIN"
+    fi
+    if [[ " ${COMPONENT_ARRAY[@]} " =~ " monitoring " ]]; then
+        info "  📊 Monitoring: https://metrics.$DOMAIN"
+    fi
+    if [[ " ${COMPONENT_ARRAY[@]} " =~ " registry " ]]; then
+        info "  🐳 Container Registry: https://registry.$DOMAIN"
+    fi
+    if [[ " ${COMPONENT_ARRAY[@]} " =~ " argocd " ]]; then
+        info "  🔄 ArgoCD: https://argocd.$DOMAIN"
+    fi
+    if [[ " ${COMPONENT_ARRAY[@]} " =~ " notebook " ]] || [[ " ${COMPONENT_ARRAY[@]} " =~ " jupyterhub " ]]; then
+        info "  📓 JupyterHub: https://notebook.$DOMAIN"
+    fi
+    echo ""
+    info "Login with your GitHub account (org: ${GITHUB_ORG:-any})"
 else
     info "  Use kubectl to manage your cluster"
+fi
+
+if [[ -d ".cluster/credentials" ]]; then
+    echo ""
+    warn "Important: Credentials saved in .cluster/credentials/"
+    warn "Keep these files secure and backed up!"
 fi

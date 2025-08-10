@@ -70,6 +70,47 @@ EOF
     cd "${SCRIPT_DIR}"
 fi
 
+# Generate dashboard configuration
+info "Generating control panel dashboard..."
+if [[ -f "${SCRIPT_DIR}/components/control-panel/generate-config.sh" ]]; then
+    bash "${SCRIPT_DIR}/components/control-panel/generate-config.sh"
+else
+    warn "Dashboard generator not found, creating default dashboard"
+    # Create default dashboard
+    cat > "${SCRIPT_DIR}/components/control-panel/index.html" <<'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K3s Cluster Control Panel</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e27;
+            color: #e4e8ee;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 { color: #667eea; }
+        p { color: #8892b0; }
+    </style>
+</head>
+<body>
+    <h1>K3s Cluster Control Panel</h1>
+    <p>Services are being discovered...</p>
+</body>
+</html>
+EOF
+fi
+
+# Create ConfigMap with dashboard
+kubectl create configmap control-panel-dashboard \
+    --namespace=control-panel \
+    --from-file=index.html="${SCRIPT_DIR}/components/control-panel/index.html" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
 # Create ConfigMap for control panel configuration
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
@@ -255,6 +296,9 @@ spec:
           readOnly: true
         - name: vps-data
           mountPath: /app/data
+        - name: dashboard
+          mountPath: /app/public
+          readOnly: true
         resources:
           requests:
             memory: "128Mi"
@@ -285,6 +329,9 @@ spec:
       - name: vps-data
         persistentVolumeClaim:
           claimName: control-panel-vps-data
+      - name: dashboard
+        configMap:
+          name: control-panel-dashboard
 ---
 apiVersion: v1
 kind: Service
