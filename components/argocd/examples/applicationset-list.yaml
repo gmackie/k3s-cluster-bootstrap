@@ -1,0 +1,43 @@
+# ApplicationSet for deploying to multiple environments
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: my-app-environments
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - env: dev
+        namespace: my-app-dev
+        values:
+          replicas: "1"
+          image: "my-app:dev"
+      - env: staging
+        namespace: my-app-staging
+        values:
+          replicas: "2"
+          image: "my-app:staging"
+      - env: prod
+        namespace: my-app-prod
+        values:
+          replicas: "3"
+          image: "my-app:v1.0.0"
+  template:
+    metadata:
+      name: 'my-app-{{env}}'
+    spec:
+      project: applications
+      source:
+        repoURL: https://git.${DOMAIN}/apps/my-app.git
+        targetRevision: HEAD
+        path: k8s/overlays/{{env}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true

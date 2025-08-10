@@ -1,0 +1,29 @@
+# This application manages all infrastructure components
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infrastructure
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: infrastructure
+  source:
+    repoURL: https://git.${DOMAIN}/infrastructure/k3s-cluster-bootstrap.git
+    targetRevision: HEAD
+    path: components
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false      # Don't delete resources not in Git
+      selfHeal: false   # Don't auto-sync on drift
+    syncOptions:
+    - CreateNamespace=true
+  # Only sync specific components
+  directory:
+    recurse: true
+    jsonnet: {}
+    exclude: '{test-*,*.md}'
+    include: '{*/install.yaml,*/manifests/*}'

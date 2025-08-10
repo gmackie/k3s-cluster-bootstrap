@@ -58,7 +58,7 @@ fi
 # Parse components
 IFS=',' read -ra COMPONENT_ARRAY <<< "$COMPONENTS"
 if [[ "$COMPONENTS" == "all" ]]; then
-    COMPONENT_ARRAY=("base" "storage" "longhorn" "secrets" "auth" "authentik" "monitoring" "registry" "npm-registry" "gitea" "drone" "k8s-dashboard" "vaultwarden" "minio" "nextcloud" "sentry" "plausible" "matrix" "mastodon" "mumble" "jupyterhub" "control-panel" "backup")
+    COMPONENT_ARRAY=("base" "storage" "longhorn" "secrets" "auth" "authentik" "monitoring" "registry" "npm-registry" "gitea" "drone" "argocd" "k8s-dashboard" "vaultwarden" "minio" "nextcloud" "sentry" "plausible" "matrix" "mastodon" "mumble" "jupyterhub" "control-panel" "backup")
 fi
 
 # Main execution

@@ -1,0 +1,66 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    # OAuth2 authentication for UI
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth-system.svc.cluster.local:4180/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://${DOMAIN}/oauth2/start?rd=$scheme://$host$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email"
+    # Allow gRPC for CLI/API without auth
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      location ~ ^/([^/]+\.)+[^/]+$ {
+        grpc_pass grpc://upstream_balancer;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        grpc_set_header X-Forwarded-Proto $scheme;
+      }
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - argocd.${DOMAIN}
+    secretName: argocd-tls
+  rules:
+  - host: argocd.${DOMAIN}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-grpc
+  namespace: argocd
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    # No auth for gRPC (CLI access)
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - argocd-grpc.${DOMAIN}
+    secretName: argocd-grpc-tls
+  rules:
+  - host: argocd-grpc.${DOMAIN}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443

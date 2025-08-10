@@ -1,0 +1,31 @@
+# ApplicationSet that creates apps from directories in Git
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-components
+  namespace: argocd
+spec:
+  generators:
+  - git:
+      repoURL: https://git.${DOMAIN}/infrastructure/k3s-cluster-bootstrap.git
+      revision: HEAD
+      directories:
+      - path: components/*
+  template:
+    metadata:
+      name: '{{path.basename}}'
+    spec:
+      project: infrastructure
+      source:
+        repoURL: https://git.${DOMAIN}/infrastructure/k3s-cluster-bootstrap.git
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true

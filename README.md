@@ -7,6 +7,7 @@ A modular, production-ready Kubernetes cluster deployment system built on K3s wi
 - 🚀 **Multi-Environment Support**: Deploy to local homelab or Hetzner Cloud
 - 📦 **Modular Architecture**: Pick and choose components
 - 🔄 **Integrated CI/CD**: Gitea with Drone CI platform
+- 🚀 **GitOps Deployment**: ArgoCD for declarative continuous delivery
 - 📊 **Full Monitoring Stack**: Prometheus, Grafana, Loki, Alertmanager
 - 🎛️ **Control Panel**: Web-based cluster management interface
 - 💾 **Flexible Storage**: Local-path, NAS, S3-compatible (MinIO)
@@ -60,6 +61,7 @@ export HETZNER_API_TOKEN=your-token-here
 | `npm-registry` | Verdaccio private npm registry | base, storage, auth |
 | `gitea` | Git server with webhooks | base, storage, auth |
 | `drone` | Container-native CI/CD platform | base, storage, auth, gitea |
+| `argocd` | GitOps continuous deployment | base, auth |
 | `k8s-dashboard` | Kubernetes Dashboard | base, auth |
 | `vaultwarden` | Password manager (Bitwarden compatible) | base, storage, auth |
 | `minio` | S3-compatible object storage | base, storage |
