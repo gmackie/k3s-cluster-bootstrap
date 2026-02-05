@@ -1,0 +1,66 @@
+# Moodle Bitnami Helm Chart Values
+# Minimal configuration for LTI integration testing
+
+## Moodle configuration
+moodleUsername: admin
+# moodlePassword: generated at install time
+moodleEmail: admin@gmac.io
+moodleSiteName: "Moodle LTI Testing"
+moodleSkipInstall: false
+moodleLang: en
+
+## Resource allocation (minimal)
+resources:
+  requests:
+    cpu: 300m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+## Persistence
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 5Gi
+
+## Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+## Ingress - disabled, we create our own
+ingress:
+  enabled: false
+
+## PostgreSQL configuration
+postgresql:
+  enabled: true
+  auth:
+    # password: generated at install time
+    database: moodle
+  primary:
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+## Disable MariaDB (use PostgreSQL)
+mariadb:
+  enabled: false
+
+## Metrics
+metrics:
+  enabled: false
+
+## Extra environment variables for LTI support
+extraEnvVars:
+  - name: MOODLE_PLUGINS_INSTALL
+    value: ""
