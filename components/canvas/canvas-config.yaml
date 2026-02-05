@@ -1,0 +1,58 @@
+# Canvas LMS Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canvas-config
+  namespace: canvas
+data:
+  # Database configuration
+  database.yml: |
+    production:
+      adapter: postgresql
+      encoding: utf8
+      database: canvas_production
+      host: canvas-postgres
+      username: canvas
+      password: <%= ENV['CANVAS_DB_PASSWORD'] %>
+      timeout: 5000
+
+  # Cache configuration
+  cache_store.yml: |
+    production:
+      cache_store: redis_cache_store
+      servers:
+        - redis://canvas-redis:6379/0
+
+  # Redis configuration
+  redis.yml: |
+    production:
+      servers:
+        - redis://canvas-redis:6379/1
+
+  # Domain configuration
+  domain.yml: |
+    production:
+      domain: "canvas.${DOMAIN}"
+      ssl: true
+
+  # Security configuration
+  security.yml: |
+    production:
+      encryption_key: "${CANVAS_ENCRYPTION_KEY}"
+
+  # Outgoing mail (placeholder)
+  outgoing_mail.yml: |
+    production:
+      address: "localhost"
+      port: "25"
+      domain: "${DOMAIN}"
+      authentication: "plain"
+
+  # Dynamic settings
+  dynamic_settings.yml: |
+    production:
+      config:
+        canvas:
+          canvas:
+            encryption-secret: "${CANVAS_ENCRYPTION_KEY}"
+            signing-secret: "${CANVAS_SIGNING_KEY}"
