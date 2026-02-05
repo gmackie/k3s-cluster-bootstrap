@@ -1,0 +1,125 @@
+# Canvas LMS Web Application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-web
+  namespace: canvas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canvas-web
+  template:
+    metadata:
+      labels:
+        app: canvas-web
+    spec:
+      initContainers:
+      # Wait for PostgreSQL
+      - name: wait-for-postgres
+        image: postgres:12-alpine
+        command: ['sh', '-c', 'until pg_isready -h canvas-postgres -U canvas; do echo waiting for postgres; sleep 2; done;']
+      # Wait for Redis
+      - name: wait-for-redis
+        image: redis:7-alpine
+        command: ['sh', '-c', 'until redis-cli -h canvas-redis ping; do echo waiting for redis; sleep 2; done;']
+      containers:
+      - name: canvas
+        image: instructure/canvas-lms:stable
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: CANVAS_LMS_ADMIN_EMAIL
+          value: "admin@${DOMAIN}"
+        - name: CANVAS_LMS_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: canvas-secrets
+              key: admin-password
+        - name: CANVAS_LMS_ACCOUNT_NAME
+          value: "LTI Testing"
+        - name: CANVAS_LMS_STATS_COLLECTION
+          value: "opt_out"
+        - name: CANVAS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: canvas-postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: CANVAS_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: canvas-secrets
+              key: encryption-key
+        - name: CANVAS_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              name: canvas-secrets
+              key: signing-key
+        - name: RAILS_ENV
+          value: "production"
+        - name: DOMAIN
+          value: "${DOMAIN}"
+        volumeMounts:
+        - name: config
+          mountPath: /usr/src/app/config/database.yml
+          subPath: database.yml
+        - name: config
+          mountPath: /usr/src/app/config/cache_store.yml
+          subPath: cache_store.yml
+        - name: config
+          mountPath: /usr/src/app/config/redis.yml
+          subPath: redis.yml
+        - name: config
+          mountPath: /usr/src/app/config/domain.yml
+          subPath: domain.yml
+        - name: config
+          mountPath: /usr/src/app/config/security.yml
+          subPath: security.yml
+        - name: config
+          mountPath: /usr/src/app/config/outgoing_mail.yml
+          subPath: outgoing_mail.yml
+        - name: config
+          mountPath: /usr/src/app/config/dynamic_settings.yml
+          subPath: dynamic_settings.yml
+        - name: canvas-data
+          mountPath: /usr/src/app/tmp
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        readinessProbe:
+          httpGet:
+            path: /health_check
+            port: 3000
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health_check
+            port: 3000
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: canvas-config
+      - name: canvas-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-web
+  namespace: canvas
+spec:
+  selector:
+    app: canvas-web
+  ports:
+  - port: 3000
+    targetPort: 3000
