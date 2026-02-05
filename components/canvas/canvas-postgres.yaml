@@ -1,0 +1,88 @@
+# Canvas PostgreSQL Database
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: canvas-postgres-pvc
+  namespace: canvas
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: longhorn
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: canvas-postgres-secret
+  namespace: canvas
+type: Opaque
+stringData:
+  POSTGRES_USER: canvas
+  POSTGRES_PASSWORD: "${CANVAS_DB_PASSWORD}"
+  POSTGRES_DB: canvas_production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-postgres
+  namespace: canvas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canvas-postgres
+  template:
+    metadata:
+      labels:
+        app: canvas-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:12-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        envFrom:
+        - secretRef:
+            name: canvas-postgres-secret
+        env:
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "canvas"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "canvas"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: canvas-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-postgres
+  namespace: canvas
+spec:
+  selector:
+    app: canvas-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
