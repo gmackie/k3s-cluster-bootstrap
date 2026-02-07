@@ -64,6 +64,9 @@ spec:
         - name: config
           mountPath: /usr/src/app/config/dynamic_settings.yml
           subPath: dynamic_settings.yml
+        - name: config
+          mountPath: /usr/src/app/config/delayed_jobs.yml
+          subPath: delayed_jobs.yml
         resources:
           requests:
             memory: "256Mi"

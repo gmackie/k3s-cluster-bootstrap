@@ -48,6 +48,12 @@ data:
       domain: "${DOMAIN}"
       authentication: "plain"
 
+  # Delayed jobs configuration
+  delayed_jobs.yml: |
+    default:
+      workers:
+        - queue: default
+
   # Dynamic settings
   dynamic_settings.yml: |
     production:

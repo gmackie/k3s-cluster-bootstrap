@@ -27,7 +27,7 @@ spec:
       - name: canvas
         image: instructure/canvas-lms:stable
         ports:
-        - containerPort: 3000
+        - containerPort: 80
           name: http
         env:
         - name: CANVAS_LMS_ADMIN_EMAIL
@@ -94,14 +94,14 @@ spec:
         readinessProbe:
           httpGet:
             path: /health_check
-            port: 3000
+            port: 80
           initialDelaySeconds: 120
           periodSeconds: 10
           timeoutSeconds: 5
         livenessProbe:
           httpGet:
             path: /health_check
-            port: 3000
+            port: 80
           initialDelaySeconds: 180
           periodSeconds: 30
           timeoutSeconds: 10
@@ -121,5 +121,5 @@ spec:
   selector:
     app: canvas-web
   ports:
-  - port: 3000
-    targetPort: 3000
+  - port: 80
+    targetPort: 80

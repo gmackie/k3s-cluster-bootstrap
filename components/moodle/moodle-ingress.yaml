@@ -1,32 +1,30 @@
-# Canvas LMS Ingress
+# Moodle LMS Ingress
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: canvas-ingress
-  namespace: canvas
+  name: moodle-ingress
+  namespace: moodle
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    # Canvas needs websocket support for some features
-    nginx.ingress.kubernetes.io/websocket-services: "canvas-web"
 spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - canvas.${DOMAIN}
-    secretName: canvas-tls
+    - moodle.${DOMAIN}
+    secretName: moodle-tls
   rules:
-  - host: canvas.${DOMAIN}
+  - host: moodle.${DOMAIN}
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: canvas-web
+            name: moodle
             port:
               number: 80

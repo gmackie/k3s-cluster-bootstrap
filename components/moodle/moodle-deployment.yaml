@@ -1,0 +1,108 @@
+# Moodle LMS Deployment
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: moodle-data-pvc
+  namespace: moodle
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: longhorn
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moodle
+  namespace: moodle
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: moodle
+  template:
+    metadata:
+      labels:
+        app: moodle
+    spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:15-alpine
+        command: ['sh', '-c', 'until pg_isready -h moodle-postgres -U moodle; do echo waiting for postgres; sleep 2; done;']
+      containers:
+      - name: moodle
+        image: ellakcy/moodle:postgresql_apache
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: MOODLE_DB_TYPE
+          value: "pgsql"
+        - name: MOODLE_DB_HOST
+          value: "moodle-postgres"
+        - name: MOODLE_DB_PORT
+          value: "5432"
+        - name: MOODLE_DB_NAME
+          value: "moodle"
+        - name: MOODLE_DB_USER
+          value: "moodle"
+        - name: MOODLE_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: moodle-secrets
+              key: postgres-password
+        - name: MOODLE_URL
+          value: "https://moodle.${DOMAIN}"
+        - name: MOODLE_ADMIN
+          value: "admin"
+        - name: MOODLE_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: moodle-secrets
+              key: admin-password
+        - name: MOODLE_ADMIN_EMAIL
+          value: "admin@${DOMAIN}"
+        - name: MOODLE_SITE_NAME
+          value: "Moodle LTI Testing"
+        volumeMounts:
+        - name: moodle-data
+          mountPath: /var/moodledata
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        readinessProbe:
+          httpGet:
+            path: /login/index.php
+            port: 80
+          initialDelaySeconds: 120
+          periodSeconds: 15
+          timeoutSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /login/index.php
+            port: 80
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+      volumes:
+      - name: moodle-data
+        persistentVolumeClaim:
+          claimName: moodle-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: moodle
+  namespace: moodle
+spec:
+  selector:
+    app: moodle
+  ports:
+  - port: 80
+    targetPort: 80

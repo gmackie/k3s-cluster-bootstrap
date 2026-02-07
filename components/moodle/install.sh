@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Moodle LMS Installation
 # Learning management system for LTI integration testing
+# Uses ellakcy/moodle Docker image with PostgreSQL
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../lib/common.sh"
@@ -44,69 +45,39 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 EOF
     chmod 600 "${SCRIPT_DIR}/../../.cluster/credentials/moodle.conf"
 
-    # Add Bitnami Helm repo
-    info "Adding Bitnami Helm repository..."
-    helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
-    helm repo update
+    # Create secrets
+    info "Creating Moodle secrets..."
+    kubectl create secret generic moodle-secrets \
+        --namespace=${COMPONENT_NAMESPACE} \
+        --from-literal=admin-password="${MOODLE_PASSWORD}" \
+        --from-literal=postgres-password="${POSTGRES_PASSWORD}" \
+        --dry-run=client -o yaml | kubectl apply -f -
 
-    # Create temporary values file with passwords
-    cat > /tmp/moodle-install-values.yaml <<EOF
-moodlePassword: "${MOODLE_PASSWORD}"
-postgresql:
-  auth:
-    password: "${POSTGRES_PASSWORD}"
-    postgresPassword: "${POSTGRES_PASSWORD}"
-EOF
+    # Export for envsubst
+    export DOMAIN
 
-    # Merge with main values file
-    info "Installing Moodle via Helm..."
-    helm upgrade --install moodle bitnami/moodle \
-        -f "${SCRIPT_DIR}/values.yaml" \
-        -f /tmp/moodle-install-values.yaml \
-        -n "${COMPONENT_NAMESPACE}" \
-        --wait \
-        --timeout 15m
+    # Deploy PostgreSQL
+    info "Deploying PostgreSQL for Moodle..."
+    kubectl apply -f "${SCRIPT_DIR}/moodle-postgres.yaml"
 
-    # Clean up temp file
-    rm -f /tmp/moodle-install-values.yaml
+    # Wait for PostgreSQL
+    info "Waiting for PostgreSQL..."
+    kubectl wait --for=condition=ready pod -l app=moodle-postgres -n ${COMPONENT_NAMESPACE} --timeout=300s
 
-    # Create ingress
-    info "Creating Moodle ingress..."
-    cat <<EOF | kubectl apply -f -
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: moodle-ingress
-  namespace: ${COMPONENT_NAMESPACE}
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - moodle.${DOMAIN}
-    secretName: moodle-tls
-  rules:
-  - host: moodle.${DOMAIN}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: moodle
-            port:
-              number: 80
-EOF
+    # Deploy Moodle
+    info "Deploying Moodle application..."
+    envsubst < "${SCRIPT_DIR}/moodle-deployment.yaml" | kubectl apply -f -
 
-    # Wait for ingress to be ready
-    info "Waiting for TLS certificate..."
-    sleep 10
+    # Deploy ingress
+    info "Deploying Moodle ingress..."
+    envsubst < "${SCRIPT_DIR}/moodle-ingress.yaml" | kubectl apply -f -
+
+    # Wait for deployment (Moodle first boot does DB setup)
+    info "Waiting for Moodle deployment (first boot may take several minutes)..."
+    kubectl rollout status deployment/moodle -n ${COMPONENT_NAMESPACE} --timeout=900s || {
+        warn "Moodle deployment is taking longer than expected."
+        warn "Check logs with: kubectl logs -n moodle -l app=moodle"
+    }
 
     success "Moodle installed successfully!"
     info ""
@@ -130,8 +101,10 @@ EOF
 uninstall_moodle() {
     info "Uninstalling Moodle..."
 
-    helm uninstall moodle -n ${COMPONENT_NAMESPACE} --ignore-not-found || true
-    kubectl delete namespace ${COMPONENT_NAMESPACE} --ignore-not-found
+    kubectl delete namespace ${COMPONENT_NAMESPACE} --ignore-not-found --timeout=120s || {
+        warn "Namespace deletion timed out. Forcing..."
+        kubectl delete namespace ${COMPONENT_NAMESPACE} --force --grace-period=0 || true
+    }
 
     success "Moodle uninstalled!"
 }
