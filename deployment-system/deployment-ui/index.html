@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Deployment Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: #2196F3;
+            color: white;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .deploy-form {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .app-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .app-card h3 {
+            margin-bottom: 10px;
+            color: #2196F3;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status.healthy {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .status.progressing {
+            background-color: #FF9800;
+            color: white;
+        }
+        
+        .status.degraded {
+            background-color: #f44336;
+            color: white;
+        }
+        
+        .output {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            display: none;
+        }
+        
+        .output.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>App Deployment Dashboard</h1>
+            <p>Deploy any Gitea repository to Kubernetes with one click</p>
+        </header>
+
+        <div class="deploy-form">
+            <h2>Deploy New Application</h2>
+            <form id="deployForm">
+                <div class="form-group">
+                    <label for="repoName">Repository Name</label>
+                    <input type="text" id="repoName" name="repoName" required 
+                           placeholder="e.g., my-awesome-app">
+                </div>
+                
+                <div class="form-group">
+                    <label for="domain">Domain (optional)</label>
+                    <input type="text" id="domain" name="domain" 
+                           placeholder="Leave empty for repo-name.gmac.io">
+                </div>
+                
+                <div class="form-group">
+                    <label for="port">Application Port</label>
+                    <input type="number" id="port" name="port" value="3000">
+                </div>
+                
+                <button type="submit">Deploy Application</button>
+            </form>
+            
+            <div id="output" class="output"></div>
+        </div>
+
+        <div>
+            <h2>Deployed Applications</h2>
+            <div class="apps-grid" id="appsGrid">
+                <!-- Apps will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // This would need to be connected to actual backend APIs
+        const API_BASE = '/api';
+        
+        document.getElementById('deployForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const repoName = formData.get('repoName');
+            const domain = formData.get('domain') || `${repoName}.gmac.io`;
+            const port = formData.get('port');
+            
+            const output = document.getElementById('output');
+            output.textContent = `Deploying ${repoName} to ${domain}...\n`;
+            output.classList.add('show');
+            
+            try {
+                // This would call the actual deployment API
+                const response = await mockDeploy(repoName, domain, port);
+                output.textContent += response;
+                
+                // Refresh apps list
+                loadApps();
+            } catch (error) {
+                output.textContent += `Error: ${error.message}\n`;
+            }
+        });
+        
+        async function mockDeploy(repoName, domain, port) {
+            // Simulate deployment
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return `
+✓ Repository cloned
+✓ Workflow added
+✓ ArgoCD application created
+✓ Deployment initiated
+
+Application will be available at: https://${domain}
+
+Next steps:
+1. Push any change to trigger deployment
+2. Monitor at https://argocd.gmac.io
+`;
+        }
+        
+        async function loadApps() {
+            // This would fetch actual apps from ArgoCD API
+            const mockApps = [
+                { name: 'control-panel', domain: 'control.gmac.io', status: 'healthy' },
+                { name: 'turntable-web', domain: 'turntable.gmac.io', status: 'progressing' },
+                { name: 'homelab', domain: 'homelab.gmac.io', status: 'healthy' },
+            ];
+            
+            const grid = document.getElementById('appsGrid');
+            grid.innerHTML = mockApps.map(app => `
+                <div class="app-card">
+                    <h3>${app.name}</h3>
+                    <p><strong>URL:</strong> <a href="https://${app.domain}" target="_blank">${app.domain}</a></p>
+                    <p><strong>Status:</strong> <span class="status ${app.status}">${app.status}</span></p>
+                    <p><strong>Repository:</strong> <a href="https://git.gmac.io/gmackie/${app.name}" target="_blank">View Code</a></p>
+                </div>
+            `).join('');
+        }
+        
+        // Load apps on page load
+        loadApps();
+    </script>
+</body>
+</html>

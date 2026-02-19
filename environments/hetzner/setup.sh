@@ -31,7 +31,7 @@ export HCLOUD_TOKEN="$HETZNER_API_TOKEN"
 
 # Configuration
 SERVER_TYPE="${HETZNER_SERVER_TYPE:-cpx11}"
-LOCATION="${HETZNER_LOCATION:-nbg1}"
+LOCATION="${HETZNER_LOCATION:-hil}"
 IMAGE="${HETZNER_IMAGE:-ubuntu-22.04}"
 SSH_KEY_NAME="k3s-cluster-key"
 
@@ -124,6 +124,7 @@ ssh -i ~/.ssh/k3s-cluster root@"$SERVER_IP" << EOF
     export DOMAIN="$DOMAIN"
     export ENVIRONMENT="hetzner"
     export NODE_TYPE="master"
+    export HETZNER_API_TOKEN="$HETZNER_API_TOKEN"
     ./bootstrap.sh --environment hetzner --components base
 EOF
 

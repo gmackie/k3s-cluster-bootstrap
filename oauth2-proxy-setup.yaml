@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oauth2-proxy-secret
+  namespace: auth-system
+type: Opaque
+data:
+  # Replace these with your actual GitHub OAuth app credentials
+  # echo -n "your-client-id" | base64
+  client-id: REPLACE_WITH_BASE64_ENCODED_CLIENT_ID
+  # echo -n "your-client-secret" | base64
+  client-secret: REPLACE_WITH_BASE64_ENCODED_CLIENT_SECRET
+  # This is a generated cookie secret - you can use this one
+  cookie-secret: REPLACE_WITH_COOKIE_SECRET
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oauth2-proxy-config
+  namespace: auth-system
+data:
+  oauth2-proxy.cfg: |
+    # Provider config
+    provider = "github"
+    
+    # Cookie config
+    cookie_secure = true
+    cookie_httponly = true
+    cookie_name = "_oauth2_proxy"
+    cookie_expire = "24h"
+    cookie_refresh = "60m"
+    cookie_domains = [".gmac.io"]
+    
+    # URLs
+    redirect_url = "https://gmac.io/oauth2/callback"
+    
+    # Upstream config
+    upstreams = ["static://202"]
+    
+    # Email domains (accept all authenticated users)
+    email_domains = ["*"]
+    
+    # GitHub restrictions (optional)
+    # Uncomment and set to restrict to specific org or users
+    # github_org = "your-org"
+    # github_user = "allowed-user1,allowed-user2"
+    
+    # Session config
+    session_store_type = "cookie"
+    
+    # HTTP config
+    http_address = "0.0.0.0:4180"
+    
+    # Logging
+    standard_logging = true
+    auth_logging = true
+    request_logging = true
+    
+    # Security
+    skip_provider_button = false
+    pass_authorization_header = true
+    pass_access_token = true
+    pass_user_headers = true
+    set_xauthrequest = true
+    set_authorization_header = true
+    
+    # Whitelist paths that don't require auth
+    skip_auth_regex = [
+      "^/oauth2",
+      "^/ping",
+      "^/healthz",
+      "^/metrics"
+    ]
+    
+    # Additional settings
+    reverse_proxy = true
+    real_client_ip_header = "X-Real-IP"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: auth-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      containers:
+      - name: oauth2-proxy
+        image: quay.io/oauth2-proxy/oauth2-proxy:v7.5.0
+        args:
+          - --config=/etc/oauth2-proxy/oauth2-proxy.cfg
+          - --client-id=$(CLIENT_ID)
+          - --client-secret=$(CLIENT_SECRET)
+          - --cookie-secret=$(COOKIE_SECRET)
+        env:
+        - name: CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secret
+              key: client-id
+        - name: CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secret
+              key: client-secret
+        - name: COOKIE_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secret
+              key: cookie-secret
+        ports:
+        - containerPort: 4180
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: /etc/oauth2-proxy
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: oauth2-proxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy
+  namespace: auth-system
+spec:
+  selector:
+    app: oauth2-proxy
+  ports:
+  - port: 4180
+    targetPort: http
+    protocol: TCP
+    name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oauth2-proxy
+  namespace: auth-system
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - gmac.io
+    secretName: oauth2-proxy-tls
+  rules:
+  - host: gmac.io
+    http:
+      paths:
+      - path: /oauth2
+        pathType: Prefix
+        backend:
+          service:
+            name: oauth2-proxy
+            port:
+              name: http

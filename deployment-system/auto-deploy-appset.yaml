@@ -1,0 +1,85 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: auto-deploy-apps
+  namespace: argocd
+spec:
+  generators:
+  # Git generator - discovers apps by looking for k8s directories
+  - git:
+      repoURL: https://git.gmac.io/gmackie/charts
+      revision: HEAD
+      directories:
+      - path: apps/*
+      
+  # List generator for manually configured apps
+  - list:
+      elements: []  # Will be dynamically updated
+      
+  template:
+    metadata:
+      name: '{{path.basename}}'
+      labels:
+        app.kubernetes.io/name: '{{path.basename}}'
+        auto-deployed: "true"
+    spec:
+      project: default
+      source:
+        repoURL: https://git.gmac.io/gmackie/{{path.basename}}
+        targetRevision: HEAD
+        path: k8s
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+        - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+---
+# Alternative: ApplicationSet that looks for repos with specific labels
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: labeled-apps
+  namespace: argocd
+spec:
+  generators:
+  - scmProvider:
+      gitea:
+        api: https://git.gmac.io
+        owner: gmackie
+        # This would require API token setup
+        # tokenRef:
+        #   secretName: gitea-token
+        #   key: token
+      filters:
+      - repositoryMatch: ".*"
+        labelMatch: "auto-deploy"  # Repos with this topic/label
+        
+  template:
+    metadata:
+      name: '{{repository}}'
+    spec:
+      project: default
+      source:
+        repoURL: '{{url}}'
+        targetRevision: '{{branch}}'
+        path: k8s
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{repository}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true

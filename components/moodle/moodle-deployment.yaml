@@ -66,6 +66,10 @@ spec:
           value: "admin@${DOMAIN}"
         - name: MOODLE_SITE_NAME
           value: "Moodle LTI Testing"
+        - name: MOODLE_REVERSE_LB
+          value: "false"
+        - name: MOODLE_SSL
+          value: "true"
         volumeMounts:
         - name: moodle-data
           mountPath: /var/moodledata

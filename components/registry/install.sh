@@ -1,65 +1,90 @@
 #!/bin/bash
-# Container Registry installation with Harbor
+set -euo pipefail
 
-source "${SCRIPT_DIR}/lib/common.sh"
+# Harbor Container Registry installation
+# This script is called by bootstrap.sh with environment variables set
+
+# Source common functions if not already loaded
+if ! command -v info >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/lib/common.sh"
+fi
+
+# Source state management functions
+if ! command -v save_credentials >/dev/null 2>&1; then
+    source "${SCRIPT_DIR}/.cluster-state.sh"
+fi
+
+# Component metadata
+COMPONENT_NAME="registry"
+COMPONENT_NAMESPACE="registry"
 
 info "Installing Harbor container registry..."
 
+# Check required variables
+if [[ -z "${DOMAIN:-}" ]]; then
+    error "DOMAIN is required for Harbor installation"
+fi
+
 # Create namespace
-ensure_namespace registry
+ensure_namespace "$COMPONENT_NAMESPACE"
 
 # Generate passwords and secrets
 HARBOR_ADMIN_PASSWORD=$(generate_password)
 HARBOR_DB_PASSWORD=$(generate_password)
 HARBOR_REDIS_PASSWORD=$(generate_password)
-REGISTRY_SECRET=$(openssl rand -base64 32)
+HARBOR_REGISTRY_PASSWORD=$(generate_password)
+CORE_SECRET=$(openssl rand -base64 32)
+JOBSERVICE_SECRET=$(openssl rand -base64 32)
 
 # Save credentials
-mkdir -p "${SCRIPT_DIR}/.cluster/credentials"
-cat > "${SCRIPT_DIR}/.cluster/credentials/registry.conf" <<EOF
-HARBOR_ADMIN_USER=admin
+save_credentials "$COMPONENT_NAME" "HARBOR_ADMIN_USER=admin
 HARBOR_ADMIN_PASSWORD=$HARBOR_ADMIN_PASSWORD
-HARBOR_URL=https://registry.${DOMAIN:-registry.local}
-REGISTRY_SECRET=$REGISTRY_SECRET
-EOF
-chmod 600 "${SCRIPT_DIR}/.cluster/credentials/registry.conf"
+HARBOR_URL=https://registry.${DOMAIN}
+HARBOR_DB_PASSWORD=$HARBOR_DB_PASSWORD"
 
 # Add Harbor Helm repository
-helm repo add harbor https://helm.goharbor.io
+info "Adding Harbor Helm repository..."
+helm repo add harbor https://helm.goharbor.io || true
 helm repo update
 
 # Create Harbor values
 cat > /tmp/harbor-values.yaml <<EOF
-# Expose configuration
+# External access configuration
 expose:
-  type: clusterIP  # We'll create our own ingress with OAuth
+  type: clusterIP
   tls:
-    enabled: false
+    enabled: false  # We'll handle TLS with cert-manager
+  clusterIP:
+    name: harbor
 
 # External URL
-externalURL: https://registry.${DOMAIN:-registry.local}
+externalURL: https://registry.${DOMAIN}
 
 # Persistence configuration
 persistence:
   enabled: true
   persistentVolumeClaim:
     registry:
-      storageClass: ${STORAGE_CLASS:-local-path}
-      size: 50Gi
+      storageClass: ${STORAGE_CLASS:-longhorn}
+      size: 20Gi
     chartmuseum:
-      storageClass: ${STORAGE_CLASS:-local-path}
+      storageClass: ${STORAGE_CLASS:-longhorn}
       size: 5Gi
     jobservice:
-      storageClass: ${STORAGE_CLASS:-local-path}
-      size: 5Gi
+      jobLog:
+        storageClass: ${STORAGE_CLASS:-longhorn}
+        size: 1Gi
+      scanDataExports:
+        storageClass: ${STORAGE_CLASS:-longhorn}
+        size: 1Gi
     database:
-      storageClass: ${STORAGE_CLASS:-local-path}
-      size: 5Gi
+      storageClass: ${STORAGE_CLASS:-longhorn}
+      size: 2Gi
     redis:
-      storageClass: ${STORAGE_CLASS:-local-path}
-      size: 5Gi
+      storageClass: ${STORAGE_CLASS:-longhorn}
+      size: 1Gi
     trivy:
-      storageClass: ${STORAGE_CLASS:-local-path}
+      storageClass: ${STORAGE_CLASS:-longhorn}
       size: 5Gi
 
 # Harbor admin password
@@ -79,23 +104,24 @@ redis:
 
 # Core component
 core:
-  secret: "$REGISTRY_SECRET"
+  secret: "$CORE_SECRET"
   xsrfKey: "$(openssl rand -base64 32)"
 
 # Jobservice
 jobservice:
-  secret: "$(openssl rand -base64 32)"
+  secret: "$JOBSERVICE_SECRET"
 
 # Registry
 registry:
   secret: "$(openssl rand -base64 32)"
   credentials:
     username: "harbor_registry_user"
-    password: "$(generate_password)"
+    password: "$HARBOR_REGISTRY_PASSWORD"
 
 # Trivy security scanner
 trivy:
   enabled: true
+  gitHubToken: ""
   resources:
     requests:
       cpu: 200m
@@ -107,6 +133,7 @@ trivy:
 # ChartMuseum (Helm chart repository)
 chartmuseum:
   enabled: true
+  absoluteUrl: false
   resources:
     requests:
       cpu: 100m
@@ -117,17 +144,17 @@ chartmuseum:
 
 # Notary (content trust)
 notary:
-  enabled: false  # Enable if you need image signing
+  enabled: false
 
 # Metrics
 metrics:
   enabled: true
   serviceMonitor:
     enabled: true
-    namespace: monitoring
 
-# Resources
+# Resource limits
 core:
+  replicas: 1
   resources:
     requests:
       cpu: 100m
@@ -137,6 +164,7 @@ core:
       memory: 1Gi
 
 jobservice:
+  replicas: 1
   resources:
     requests:
       cpu: 100m
@@ -146,6 +174,7 @@ jobservice:
       memory: 1Gi
 
 registry:
+  replicas: 1
   resources:
     requests:
       cpu: 100m
@@ -155,6 +184,7 @@ registry:
       memory: 2Gi
 
 portal:
+  replicas: 1
   resources:
     requests:
       cpu: 100m
@@ -162,171 +192,120 @@ portal:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# Security settings
+internalTLS:
+  enabled: false
+
+# Proxy cache
+proxy:
+  httpProxy: ""
+  httpsProxy: ""
+  noProxy: "127.0.0.1,localhost,.local,.internal"
+  components:
+    - core
+    - jobservice
+    - trivy
 EOF
 
 # Install Harbor
 info "Installing Harbor via Helm..."
 helm upgrade --install harbor harbor/harbor \
   -f /tmp/harbor-values.yaml \
-  -n registry \
+  -n "$COMPONENT_NAMESPACE" \
   --wait \
-  --timeout 10m
+  --timeout 15m
 
 # Wait for Harbor to be ready
-wait_for_deployment registry harbor-core
-wait_for_deployment registry harbor-jobservice
-wait_for_deployment registry harbor-portal
-wait_for_deployment registry harbor-registry
+info "Waiting for Harbor components to be ready..."
+wait_for_deployment "$COMPONENT_NAMESPACE" "harbor-core"
+wait_for_deployment "$COMPONENT_NAMESPACE" "harbor-jobservice"
+wait_for_deployment "$COMPONENT_NAMESPACE" "harbor-portal"
+wait_for_deployment "$COMPONENT_NAMESPACE" "harbor-registry"
 
-# Create default project for cluster images
-info "Configuring Harbor projects..."
+# Create ingress with OAuth2 authentication
+info "Creating Harbor ingress with OAuth2 authentication..."
+cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: harbor-ingress
+  namespace: $COMPONENT_NAMESPACE
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # OAuth2 annotations for UI only
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth-system.svc.cluster.local:4180/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://${DOMAIN}/oauth2/start?rd=\$scheme://\$host\$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Access-Token"
+    # Skip auth for API and v2 endpoints (for docker client)
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if (\$request_uri ~* "^/api/.*|^/v2/.*|^/chartrepo/.*|^/service/.*") {
+        set \$auth_header "";
+      }
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - registry.${DOMAIN}
+    secretName: harbor-tls
+  rules:
+  - host: registry.${DOMAIN}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor
+            port:
+              number: 80
+EOF
 
-# Wait for Harbor API to be ready
-sleep 30
-
-# Create system project
-curl -X POST "https://${DOMAIN:-registry.local}/api/v2.0/projects" \
-  -H "Content-Type: application/json" \
-  -u "admin:$HARBOR_ADMIN_PASSWORD" \
-  -d '{
-    "project_name": "k3s-system",
-    "metadata": {
-      "public": "false",
-      "enable_content_trust": "false",
-      "auto_scan": "true",
-      "severity": "high",
-      "reuse_sys_cve_allowlist": "true"
-    }
-  }' || true
-
-# Create public project for shared images
-curl -X POST "https://${DOMAIN:-registry.local}/api/v2.0/projects" \
-  -H "Content-Type: application/json" \
-  -u "admin:$HARBOR_ADMIN_PASSWORD" \
-  -d '{
-    "project_name": "public",
-    "metadata": {
-      "public": "true",
-      "enable_content_trust": "false",
-      "auto_scan": "true"
-    }
-  }' || true
-
-# Configure image pull secrets for Kubernetes
+# Create image pull secrets for default namespaces
 info "Creating image pull secrets..."
-
-# Create docker registry secret for each namespace
-for ns in default kube-system monitoring gitea control-panel backup; do
-  kubectl create secret docker-registry regcred \
-    --docker-server="${DOMAIN:-registry.local}" \
+for ns in default kube-system; do
+  kubectl create secret docker-registry harbor-regcred \
+    --docker-server="registry.${DOMAIN}" \
     --docker-username=admin \
     --docker-password="$HARBOR_ADMIN_PASSWORD" \
-    --docker-email=admin@${DOMAIN:-registry.local} \
+    --docker-email="${ADMIN_EMAIL:-admin@${DOMAIN}}" \
     -n $ns \
     --dry-run=client -o yaml | kubectl apply -f -
 done
 
-# Create service account with image pull secret
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: default
-  namespace: default
-imagePullSecrets:
-- name: regcred
-EOF
-
-# Configure garbage collection
-info "Configuring garbage collection..."
-cat <<EOF | kubectl apply -f -
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: harbor-gc
-  namespace: registry
-spec:
-  schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          restartPolicy: OnFailure
-          containers:
-          - name: gc
-            image: curlimages/curl:latest
-            command:
-            - /bin/sh
-            - -c
-            - |
-              curl -X POST "https://harbor-core.registry/api/v2.0/system/gc/schedule" \
-                -H "Content-Type: application/json" \
-                -u "admin:$HARBOR_ADMIN_PASSWORD" \
-                -d '{
-                  "schedule": {
-                    "type": "Weekly",
-                    "weekday": 0,
-                    "offtime": 7200
-                  },
-                  "job_parameters": {
-                    "delete_untagged": true,
-                    "dry_run": false
-                  }
-                }'
-EOF
-
-# Create proxy cache projects for common registries
-info "Setting up proxy cache for Docker Hub..."
-curl -X POST "https://${DOMAIN:-registry.local}/api/v2.0/registries" \
-  -H "Content-Type: application/json" \
-  -u "admin:$HARBOR_ADMIN_PASSWORD" \
-  -d '{
-    "name": "docker-hub",
-    "type": "docker-hub",
-    "url": "https://hub.docker.com",
-    "description": "Docker Hub proxy cache"
-  }' || true
-
-# Create proxy project
-curl -X POST "https://${DOMAIN:-registry.local}/api/v2.0/projects" \
-  -H "Content-Type: application/json" \
-  -u "admin:$HARBOR_ADMIN_PASSWORD" \
-  -d '{
-    "project_name": "dockerhub-proxy",
-    "registry_id": 1,
-    "metadata": {
-      "public": "true",
-      "enable_content_trust": "false",
-      "auto_scan": "false"
-    }
-  }' || true
-
-# Deploy ingress with OAuth2 authentication
-if [[ -n "${DOMAIN:-}" ]]; then
-    info "Deploying Harbor ingress with OAuth2 authentication..."
-    envsubst < "${SCRIPT_DIR}/harbor-ingress.yaml" | kubectl apply -f -
-fi
+# Configure default service account to use the pull secret
+kubectl patch serviceaccount default -n default -p '{"imagePullSecrets": [{"name": "harbor-regcred"}]}'
 
 # Clean up
 rm -f /tmp/harbor-values.yaml
 
-success "Harbor registry installed successfully"
+success "Harbor registry installed successfully!"
 info "=== Harbor Access Information ==="
-info "URL: https://registry.${DOMAIN:-registry.local}"
+info "URL: https://registry.${DOMAIN}"
 info "Username: admin"
-info "Password: Saved to .cluster/credentials/registry.conf"
+info "Password: Saved in .cluster/credentials/registry.conf"
 info ""
 info "=== Docker Login ==="
-info "docker login ${DOMAIN:-registry.local}"
+info "docker login registry.${DOMAIN}"
 info ""
 info "=== Push Image Example ==="
-info "docker tag myapp:latest ${DOMAIN:-registry.local}/k3s-system/myapp:latest"
-info "docker push ${DOMAIN:-registry.local}/k3s-system/myapp:latest"
+info "docker tag myapp:latest registry.${DOMAIN}/library/myapp:latest"
+info "docker push registry.${DOMAIN}/library/myapp:latest"
 info ""
 info "=== Features Enabled ==="
 info "✓ Container registry with web UI"
 info "✓ Vulnerability scanning with Trivy"
-info "✓ Helm chart repository"
-info "✓ RBAC and project isolation"
-info "✓ Proxy cache for Docker Hub"
-info "✓ Metrics and monitoring"
+info "✓ Helm chart repository (ChartMuseum)"
+info "✓ Project-based access control"
+info "✓ Image replication and retention policies"
+info "✓ Webhook notifications"
+info ""
+info "=== Notes ==="
+info "- Web UI requires OAuth2 authentication"
+info "- Docker CLI access uses Harbor credentials"
+info "- Default 'library' project is public"
+info "- Create projects via UI for team isolation"

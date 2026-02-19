@@ -1,0 +1,377 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: landing-page-html
+  namespace: control-panel
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${DOMAIN_NAME}</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                background-color: #000;
+                color: #FFB6C1;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            
+            .header {
+                position: fixed;
+                top: 0;
+                right: 0;
+                padding: 20px;
+                z-index: 1000;
+            }
+            
+            .user-menu {
+                position: relative;
+            }
+            
+            .user-box {
+                background: linear-gradient(135deg, #FFB6C1, #E6E6FA, #98FB98);
+                padding: 2px;
+                border-radius: 12px;
+                cursor: pointer;
+                transition: transform 0.2s ease;
+            }
+            
+            .user-box:hover {
+                transform: scale(1.05);
+            }
+            
+            .user-content {
+                background: #000;
+                padding: 12px 20px;
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                border: 2px solid #E6E6FA;
+            }
+            
+            .username {
+                color: #98FB98;
+                font-weight: 600;
+                font-size: 16px;
+            }
+            
+            .lock-icon {
+                color: #FFD700;
+                font-size: 20px;
+            }
+            
+            .dropdown {
+                position: absolute;
+                top: 100%;
+                right: 0;
+                margin-top: 10px;
+                background: linear-gradient(135deg, #FFB6C1, #E6E6FA);
+                padding: 2px;
+                border-radius: 8px;
+                opacity: 0;
+                visibility: hidden;
+                transform: translateY(-10px);
+                transition: all 0.3s ease;
+            }
+            
+            .dropdown.show {
+                opacity: 1;
+                visibility: visible;
+                transform: translateY(0);
+            }
+            
+            .dropdown-content {
+                background: #000;
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            
+            .logout-btn {
+                display: block;
+                width: 100%;
+                padding: 12px 24px;
+                background: none;
+                border: none;
+                color: #FFB6C1;
+                font-size: 16px;
+                cursor: pointer;
+                text-align: left;
+                transition: background 0.2s ease;
+            }
+            
+            .logout-btn:hover {
+                background: rgba(255, 182, 193, 0.1);
+            }
+            
+            .welcome-container {
+                flex: 1;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+            }
+            
+            .welcome-text {
+                text-align: center;
+                animation: fadeIn 1s ease-out;
+            }
+            
+            .welcome-text h1 {
+                font-size: clamp(3rem, 8vw, 6rem);
+                background: linear-gradient(45deg, #FFB6C1, #E6E6FA, #98FB98, #FFD700);
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 20px;
+                animation: gradient 3s ease infinite;
+                background-size: 400% 400%;
+            }
+            
+            .welcome-text p {
+                font-size: clamp(1.2rem, 3vw, 1.8rem);
+                color: #E6E6FA;
+                opacity: 0.8;
+            }
+            
+            .control-panel-link {
+                margin-top: 40px;
+                display: inline-block;
+                padding: 16px 32px;
+                background: linear-gradient(135deg, #FFB6C1, #E6E6FA, #98FB98);
+                border-radius: 12px;
+                text-decoration: none;
+                color: #000;
+                font-weight: 600;
+                font-size: 18px;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                animation: fadeIn 1.5s ease-out 0.5s both;
+            }
+            
+            .control-panel-link:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 20px rgba(255, 182, 193, 0.4);
+            }
+            
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            @keyframes gradient {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+            }
+            
+            .loading {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid rgba(255, 182, 193, 0.3);
+                border-radius: 50%;
+                border-top-color: #FFB6C1;
+                animation: spin 1s ease-in-out infinite;
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="header">
+            <div class="user-menu" id="userMenu">
+                <div class="user-box" onclick="toggleDropdown()">
+                    <div class="user-content">
+                        <img id="avatar" class="avatar" src="" alt="User Avatar" style="display:none;">
+                        <span id="username" class="username">Loading...</span>
+                        <span class="lock-icon">🔒</span>
+                    </div>
+                </div>
+                <div class="dropdown" id="dropdown">
+                    <div class="dropdown-content">
+                        <button class="logout-btn" onclick="logout()">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <div class="welcome-container">
+            <div class="welcome-text">
+                <h1>Welcome to ${DOMAIN_NAME}</h1>
+                <p>Your infrastructure awaits</p>
+                <a href="https://control.${DOMAIN_NAME}" class="control-panel-link">Open Control Panel</a>
+            </div>
+        </div>
+        
+        <script>
+            let dropdownOpen = false;
+            
+            // Get user info from OAuth2 proxy headers
+            async function getUserInfo() {
+                try {
+                    const response = await fetch('/oauth2/auth', {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const email = response.headers.get('X-Auth-Request-Email');
+                        const user = response.headers.get('X-Auth-Request-User');
+                        
+                        // Extract GitHub username from email or user header
+                        const username = user || email?.split('@')[0] || 'User';
+                        
+                        document.getElementById('username').textContent = username;
+                        
+                        // Try to get GitHub avatar
+                        if (username && username !== 'User') {
+                            const avatarUrl = `https://github.com/${username}.png?size=80`;
+                            const avatar = document.getElementById('avatar');
+                            avatar.src = avatarUrl;
+                            avatar.style.display = 'block';
+                            avatar.onerror = () => {
+                                avatar.style.display = 'none';
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching user info:', error);
+                    document.getElementById('username').textContent = 'Guest';
+                }
+            }
+            
+            function toggleDropdown() {
+                dropdownOpen = !dropdownOpen;
+                const dropdown = document.getElementById('dropdown');
+                if (dropdownOpen) {
+                    dropdown.classList.add('show');
+                } else {
+                    dropdown.classList.remove('show');
+                }
+            }
+            
+            function logout() {
+                window.location.href = '/oauth2/sign_out?rd=https://${DOMAIN_NAME}';
+            }
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (event) => {
+                const userMenu = document.getElementById('userMenu');
+                if (!userMenu.contains(event.target) && dropdownOpen) {
+                    toggleDropdown();
+                }
+            });
+            
+            // Load user info on page load
+            getUserInfo();
+        </script>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: landing-page
+  namespace: control-panel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: landing-page
+  template:
+    metadata:
+      labels:
+        app: landing-page
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
+      volumes:
+      - name: html
+        configMap:
+          name: landing-page-html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: landing-page
+  namespace: control-panel
+spec:
+  selector:
+    app: landing-page
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: landing-page
+  namespace: control-panel
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # OAuth2 annotations
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth-system.svc.cluster.local:4180/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://${DOMAIN_NAME}/oauth2/start?rd=$scheme://$host$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Access-Token"
+    # Pass auth headers to the app
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Auth-Request-User $upstream_http_x_auth_request_user;
+      proxy_set_header X-Auth-Request-Email $upstream_http_x_auth_request_email;
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - ${DOMAIN_NAME}
+    secretName: landing-page-tls
+  rules:
+  - host: ${DOMAIN_NAME}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: landing-page
+            port:
+              number: 80

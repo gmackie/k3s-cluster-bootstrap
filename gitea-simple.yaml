@@ -1,0 +1,255 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-data
+  namespace: gitea
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-postgres
+  namespace: gitea
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-config
+  namespace: gitea
+data:
+  app.ini: |
+    APP_NAME = Gitea: Git Service
+    RUN_MODE = prod
+    
+    [server]
+    PROTOCOL = http
+    DOMAIN = git.gmac.io
+    ROOT_URL = https://git.gmac.io/
+    HTTP_PORT = 3000
+    DISABLE_SSH = false
+    SSH_PORT = 22
+    START_SSH_SERVER = true
+    SSH_LISTEN_PORT = 22
+    
+    [database]
+    DB_TYPE = postgres
+    HOST = gitea-postgres:5432
+    NAME = gitea
+    USER = gitea
+    PASSWD = gitea
+    
+    [security]
+    INSTALL_LOCK = true
+    SECRET_KEY = changeme
+    
+    [service]
+    DISABLE_REGISTRATION = false
+    REQUIRE_SIGNIN_VIEW = false
+    
+    [log]
+    MODE = console
+    LEVEL = Info
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea-postgres
+  namespace: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea-postgres
+  template:
+    metadata:
+      labels:
+        app: gitea-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14-alpine
+        env:
+        - name: POSTGRES_DB
+          value: gitea
+        - name: POSTGRES_USER
+          value: gitea
+        - name: POSTGRES_PASSWORD
+          value: gitea
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: gitea-postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-postgres
+  namespace: gitea
+spec:
+  selector:
+    app: gitea-postgres
+  ports:
+  - port: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea
+  template:
+    metadata:
+      labels:
+        app: gitea
+    spec:
+      initContainers:
+      - name: init-db
+        image: postgres:14-alpine
+        command: 
+        - sh
+        - -c
+        - |
+          until pg_isready -h gitea-postgres -p 5432; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+      containers:
+      - name: gitea
+        image: gitea/gitea:1.22
+        ports:
+        - containerPort: 3000
+          name: http
+        - containerPort: 22
+          name: ssh
+        env:
+        - name: USER_UID
+          value: "1000"
+        - name: USER_GID
+          value: "1000"
+        - name: GITEA__database__DB_TYPE
+          value: postgres
+        - name: GITEA__database__HOST
+          value: gitea-postgres:5432
+        - name: GITEA__database__NAME
+          value: gitea
+        - name: GITEA__database__USER
+          value: gitea
+        - name: GITEA__database__PASSWD
+          value: gitea
+        - name: GITEA__server__DOMAIN
+          value: git.gmac.io
+        - name: GITEA__server__ROOT_URL
+          value: https://git.gmac.io/
+        - name: GITEA__server__SSH_PORT
+          value: "22"
+        - name: GITEA__security__INSTALL_LOCK
+          value: "true"
+        - name: GITEA__security__SECRET_KEY
+          value: "ThisIsATemporarySecretKey123"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: gitea-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-http
+  namespace: gitea
+spec:
+  selector:
+    app: gitea
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-ssh
+  namespace: gitea
+spec:
+  type: LoadBalancer
+  selector:
+    app: gitea
+  ports:
+  - name: ssh
+    port: 22
+    targetPort: 22
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitea
+  namespace: gitea
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    # OAuth2 annotations
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth-system.svc.cluster.local:4180/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://gmac.io/oauth2/start?rd=$scheme://$host$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Access-Token"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - git.gmac.io
+    secretName: gitea-tls
+  rules:
+  - host: git.gmac.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: gitea-http
+            port:
+              number: 3000

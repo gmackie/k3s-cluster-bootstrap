@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: root-redirect-html
+  namespace: control-panel
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>gmac.io Infrastructure</title>
+        <meta http-equiv="refresh" content="0; url=https://control.gmac.io">
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background-color: #f5f5f5;
+            }
+            .container {
+                text-align: center;
+                padding: 2rem;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            h1 { color: #333; }
+            p { color: #666; }
+            a { color: #0066cc; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>gmac.io Infrastructure</h1>
+            <p>Redirecting to <a href="https://control.gmac.io">Control Panel</a>...</p>
+            <p>If you are not redirected automatically, <a href="https://control.gmac.io">click here</a>.</p>
+        </div>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: root-redirect
+  namespace: control-panel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: root-redirect
+  template:
+    metadata:
+      labels:
+        app: root-redirect
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
+      volumes:
+      - name: html
+        configMap:
+          name: root-redirect-html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: root-redirect
+  namespace: control-panel
+spec:
+  selector:
+    app: root-redirect
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: root-redirect
+  namespace: control-panel
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Add OAuth2 annotations
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.auth-system.svc.cluster.local:4180/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://gmac.io/oauth2/start?rd=$scheme://$host$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Access-Token"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - gmac.io
+    secretName: root-redirect-tls
+  rules:
+  - host: gmac.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: root-redirect
+            port:
+              number: 80

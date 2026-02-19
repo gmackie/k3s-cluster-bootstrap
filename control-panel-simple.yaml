@@ -1,0 +1,409 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: control-panel-html
+  namespace: control-panel
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Control Panel - ${DOMAIN_NAME}</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                background-color: #0a0a0a;
+                color: #e0e0e0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                line-height: 1.6;
+            }
+            
+            .header {
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                padding: 20px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            }
+            
+            .header-content {
+                max-width: 1200px;
+                margin: 0 auto;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .logo {
+                font-size: 24px;
+                font-weight: bold;
+                background: linear-gradient(45deg, #FFB6C1, #E6E6FA, #98FB98);
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            
+            .user-info {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .username {
+                color: #98FB98;
+            }
+            
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 40px 20px;
+            }
+            
+            .welcome-section {
+                text-align: center;
+                margin-bottom: 60px;
+            }
+            
+            .welcome-section h1 {
+                font-size: 48px;
+                margin-bottom: 20px;
+                background: linear-gradient(45deg, #FFB6C1, #E6E6FA, #98FB98, #FFD700);
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                animation: gradient 3s ease infinite;
+                background-size: 400% 400%;
+            }
+            
+            @keyframes gradient {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+            }
+            
+            .services-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 30px;
+                margin-bottom: 60px;
+            }
+            
+            .service-card {
+                background: #1a1a2e;
+                border: 1px solid #2a2a3e;
+                border-radius: 12px;
+                padding: 30px;
+                transition: all 0.3s ease;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .service-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #FFB6C1, #E6E6FA, #98FB98);
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            
+            .service-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                border-color: #3a3a4e;
+            }
+            
+            .service-card:hover::before {
+                opacity: 1;
+            }
+            
+            .service-icon {
+                font-size: 48px;
+                margin-bottom: 20px;
+            }
+            
+            .service-title {
+                font-size: 24px;
+                margin-bottom: 10px;
+                color: #E6E6FA;
+            }
+            
+            .service-description {
+                color: #b0b0b0;
+                margin-bottom: 20px;
+            }
+            
+            .service-link {
+                display: inline-block;
+                padding: 10px 20px;
+                background: linear-gradient(135deg, #FFB6C1, #E6E6FA);
+                color: #000;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: 600;
+                transition: transform 0.2s ease;
+            }
+            
+            .service-link:hover {
+                transform: scale(1.05);
+            }
+            
+            .stats-section {
+                background: #1a1a2e;
+                border-radius: 12px;
+                padding: 40px;
+                margin-bottom: 40px;
+            }
+            
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 30px;
+            }
+            
+            .stat-card {
+                text-align: center;
+            }
+            
+            .stat-value {
+                font-size: 36px;
+                font-weight: bold;
+                color: #98FB98;
+                margin-bottom: 10px;
+            }
+            
+            .stat-label {
+                color: #b0b0b0;
+                font-size: 14px;
+                text-transform: uppercase;
+            }
+            
+            .loading {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid rgba(255, 182, 193, 0.3);
+                border-radius: 50%;
+                border-top-color: #FFB6C1;
+                animation: spin 1s ease-in-out infinite;
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">Control Panel</div>
+                <div class="user-info">
+                    <span class="username" id="username">Loading...</span>
+                    <a href="/" style="color: #FFB6C1; text-decoration: none;">← Back to Home</a>
+                </div>
+            </div>
+        </header>
+        
+        <div class="container">
+            <section class="welcome-section">
+                <h1>Infrastructure Control Panel</h1>
+                <p style="font-size: 20px; color: #b0b0b0;">Manage your ${DOMAIN_NAME} infrastructure</p>
+            </section>
+            
+            <section class="stats-section">
+                <h2 style="margin-bottom: 30px; color: #E6E6FA;">Cluster Status</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="nodeCount">-</div>
+                        <div class="stat-label">Nodes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="podCount">-</div>
+                        <div class="stat-label">Running Pods</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="serviceCount">-</div>
+                        <div class="stat-label">Services</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="namespaceCount">-</div>
+                        <div class="stat-label">Namespaces</div>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="services-section">
+                <h2 style="margin-bottom: 30px; color: #E6E6FA;">Available Services</h2>
+                <div class="services-grid" id="servicesGrid">
+                    <div class="loading"></div>
+                </div>
+            </section>
+        </div>
+        
+        <script>
+            // Get user info
+            async function getUserInfo() {
+                try {
+                    const response = await fetch('/oauth2/auth', {
+                        headers: {'X-Requested-With': 'XMLHttpRequest'}
+                    });
+                    if (response.ok) {
+                        const email = response.headers.get('X-Auth-Request-Email');
+                        const user = response.headers.get('X-Auth-Request-User');
+                        const username = user || email?.split('@')[0] || 'User';
+                        document.getElementById('username').textContent = username;
+                    }
+                } catch (error) {
+                    console.error('Error fetching user info:', error);
+                }
+            }
+            
+            // Service definitions
+            const services = [
+                {
+                    name: 'Kubernetes Dashboard',
+                    icon: '☸️',
+                    description: 'Native Kubernetes dashboard for cluster management',
+                    url: 'https://dashboard.${DOMAIN_NAME}',
+                    namespace: 'kubernetes-dashboard'
+                },
+                {
+                    name: 'Grafana',
+                    icon: '📊',
+                    description: 'Metrics visualization and monitoring dashboards',
+                    url: 'https://grafana.${DOMAIN_NAME}',
+                    namespace: 'monitoring'
+                },
+                {
+                    name: 'Prometheus',
+                    icon: '🔥',
+                    description: 'Metrics collection and alerting',
+                    url: 'https://prometheus.${DOMAIN_NAME}',
+                    namespace: 'monitoring'
+                },
+                {
+                    name: 'Alertmanager',
+                    icon: '🚨',
+                    description: 'Alert routing and notification management',
+                    url: 'https://alertmanager.${DOMAIN_NAME}',
+                    namespace: 'monitoring'
+                },
+                {
+                    name: 'ArgoCD',
+                    icon: '🔄',
+                    description: 'GitOps continuous deployment',
+                    url: 'https://argocd.${DOMAIN_NAME}',
+                    namespace: 'argocd'
+                },
+                {
+                    name: 'Gitea',
+                    icon: '📦',
+                    description: 'Git repository hosting',
+                    url: 'https://git.${DOMAIN_NAME}',
+                    namespace: 'gitea'
+                },
+                {
+                    name: 'Docker Registry',
+                    icon: '🐳',
+                    description: 'Container image registry',
+                    url: 'https://registry.${DOMAIN_NAME}',
+                    namespace: 'registry'
+                },
+                {
+                    name: 'Longhorn',
+                    icon: '💾',
+                    description: 'Distributed storage management',
+                    url: 'https://longhorn.${DOMAIN_NAME}',
+                    namespace: 'longhorn-system'
+                }
+            ];
+            
+            // Load services
+            function loadServices() {
+                const grid = document.getElementById('servicesGrid');
+                grid.innerHTML = '';
+                
+                services.forEach(service => {
+                    const card = document.createElement('div');
+                    card.className = 'service-card';
+                    card.innerHTML = `
+                        <div class="service-icon">${service.icon}</div>
+                        <h3 class="service-title">${service.name}</h3>
+                        <p class="service-description">${service.description}</p>
+                        <a href="${service.url}" class="service-link" target="_blank">Open →</a>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+            
+            // Simulated cluster stats (in a real app, these would come from the backend)
+            function loadStats() {
+                // These are example values - in production, fetch from backend API
+                document.getElementById('nodeCount').textContent = '1';
+                document.getElementById('podCount').textContent = '42';
+                document.getElementById('serviceCount').textContent = '18';
+                document.getElementById('namespaceCount').textContent = '12';
+            }
+            
+            // Initialize
+            getUserInfo();
+            loadServices();
+            loadStats();
+        </script>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-panel
+  namespace: control-panel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: control-panel
+  template:
+    metadata:
+      labels:
+        app: control-panel
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
+      volumes:
+      - name: html
+        configMap:
+          name: control-panel-html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-panel
+  namespace: control-panel
+spec:
+  selector:
+    app: control-panel
+  ports:
+  - port: 80
+    targetPort: 80
